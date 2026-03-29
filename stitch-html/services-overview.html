@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&amp;family=Work+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-tint": "#4a5f81",
+              "surface-container-low": "#f6f2f8",
+              "on-secondary-fixed": "#360f00",
+              "tertiary-fixed": "#cce5ff",
+              "secondary-container": "#fd6c22",
+              "on-error": "#ffffff",
+              "surface-container": "#f0edf2",
+              "on-primary": "#ffffff",
+              "on-secondary-container": "#591d00",
+              "inverse-primary": "#b2c7ef",
+              "on-secondary": "#ffffff",
+              "primary-fixed": "#d5e3ff",
+              "on-background": "#1b1b1f",
+              "on-tertiary-fixed": "#001e31",
+              "error-container": "#ffdad6",
+              "background": "#fbf8fe",
+              "on-primary-container": "#768baf",
+              "outline-variant": "#c4c6cf",
+              "surface-container-high": "#eae7ed",
+              "primary-container": "#0a2342",
+              "tertiary-container": "#00253c",
+              "surface-bright": "#fbf8fe",
+              "tertiary-fixed-dim": "#9ecbf4",
+              "on-secondary-fixed-variant": "#7d2d00",
+              "on-primary-fixed": "#021c3a",
+              "secondary": "#a43d00",
+              "surface-variant": "#e4e1e7",
+              "primary-fixed-dim": "#b2c7ef",
+              "outline": "#74777e",
+              "on-tertiary-fixed-variant": "#174a6d",
+              "surface-dim": "#dcd9de",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "on-primary-fixed-variant": "#324768",
+              "tertiary": "#000e1a",
+              "on-surface-variant": "#44474e",
+              "surface": "#fbf8fe",
+              "primary": "#000d22",
+              "inverse-on-surface": "#f3f0f5",
+              "secondary-fixed": "#ffdbcd",
+              "on-error-container": "#93000a",
+              "on-surface": "#1b1b1f",
+              "surface-container-highest": "#e4e1e7",
+              "inverse-surface": "#303034",
+              "secondary-fixed-dim": "#ffb597",
+              "on-tertiary-container": "#628eb4",
+              "error": "#ba1a1a"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Work Sans"],
+              "label": ["Work Sans"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Work Sans', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; letter-spacing: -0.02em; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 sticky z-50 border-t-2 border-[#FD6C22] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-[0_40px_40px_rgba(10,35,66,0.06)]">
+<div class="flex justify-between items-center w-full px-6 py-4 max-w-7xl mx-auto">
+<div class="text-xl font-bold tracking-tighter text-[#0A2342] dark:text-white">
+                iRestorationpros
+            </div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-[#44474E] dark:text-slate-400 font-medium hover:text-[#0A2342] dark:hover:text-white transition-colors" href="#">Home</a>
+<a class="text-[#FD6C22] font-bold border-b-2 border-[#FD6C22] pb-1" href="#">Services</a>
+<a class="text-[#44474E] dark:text-slate-400 font-medium hover:text-[#0A2342] dark:hover:text-white transition-colors" href="#">How It Works</a>
+<a class="text-[#44474E] dark:text-slate-400 font-medium hover:text-[#0A2342] dark:hover:text-white transition-colors" href="#">Service Areas</a>
+</nav>
+<div class="flex items-center gap-4">
+<a class="hidden lg:block text-[#0A2342] font-bold" href="tel:8005550199">(800) 555-0199</a>
+<button class="bg-secondary-container text-white px-6 py-2 rounded-full font-bold hover:bg-secondary transition-all active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">emergency_home</span>
+                    Get Help Now
+                </button>
+</div>
+</div>
+</header>
+<main>
+<!-- Hero Section -->
+<section class="relative pt-20 pb-32 overflow-hidden">
+<div class="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+<div class="z-10">
+<span class="text-secondary font-bold tracking-widest uppercase text-sm mb-4 block">Professional Restoration</span>
+<h1 class="text-5xl md:text-7xl font-extrabold text-primary-container leading-[1.1] mb-6">
+                        Expert Recovery <br/><span class="text-secondary">When It Matters.</span>
+</h1>
+<p class="text-on-surface-variant text-lg max-w-md mb-10 leading-relaxed">
+                        Rapid-response restoration services designed to bring calm to the chaos. Licensed, bonded, and ready 24/7.
+                    </p>
+<div class="flex flex-wrap gap-4">
+<button class="bg-primary-container text-white px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all">View All Services</button>
+<div class="flex items-center gap-3 px-6">
+<span class="material-symbols-outlined text-secondary">verified_user</span>
+<span class="font-semibold text-primary-container">IICRC Certified</span>
+</div>
+</div>
+</div>
+<div class="relative">
+<div class="aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl transform md:translate-x-12 md:-rotate-2">
+<img class="w-full h-full object-cover" data-alt="Modern high-end living room interior with clean architecture, soft morning light, and perfectly restored wood flooring and white walls." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5H3cNBgemQsI57UlEo4YM5uvJvVCBg8UZPyYskiTYBa5tLnkC1QdGQn6NDArGlMt9pBtTRDYPChPYh9-maga5srischtWbiUUVvG2G7eCT3bKWGAi29CVhCEDloYe0_t6pi1nutqejQNxcigrXyiD1DfZSKlRp1SIR7Q9QUaNhz9a684DtafsYbuYR3Ej9ncsmom-GtcMiojhIZWzZpOVUJq1g4VtaI_3rVUUQCoFL5PkNGBQ2ii2k--NO196ds8CnU7hBh8dyPqu"/>
+</div>
+<div class="absolute -bottom-8 -left-8 bg-surface-container-lowest p-8 rounded-2xl shadow-xl max-w-xs hidden md:block border-l-4 border-secondary">
+<p class="text-primary-container font-bold italic">"They were on-site in 45 minutes and saved our hardwood floors. Truly professional."</p>
+<p class="text-on-surface-variant text-sm mt-4">— Sarah J., Homeowner</p>
+</div>
+</div>
+</div>
+<!-- Decorative background element -->
+<div class="absolute top-0 right-0 w-1/3 h-full bg-surface-container-low -z-10 rounded-l-[100px]"></div>
+</section>
+<!-- Service: Water Damage -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid md:grid-cols-12 gap-12 items-center">
+<div class="md:col-span-7 order-2 md:order-1">
+<div class="bg-surface-container-lowest p-2 rounded-[2rem] shadow-sm">
+<img class="w-full h-[500px] object-cover rounded-[1.8rem]" data-alt="Professional water extraction technician using industrial equipment on a flooded basement floor, high-tech moisture meters visible, focused lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmOB7BWUoscQy7ef6I1QI-Nw-SJynVFZRYGxXf8u8R3rTdPmT4KkS8Y62TWD_yH9dy5peJ54wCiVPl-cwsTLCWKpeQSlKR8jB-9PZn6V8Lz2LI1Yjhh8qzheAYETgI9UKecGa4oOXGiZvOW6pwv9pb8zHfbUDMqXxQXiB-SrCGNLqAJuqCJvXrNktXAg4EsTgEOMFSrz09bS5uWRozCVOY70eZnQAEve2uf9Jv69eMcp8yn2yctshBuiBl9SOJSwm0oq5rm1JDZ47W"/>
+</div>
+</div>
+<div class="md:col-span-5 order-1 md:order-2">
+<h2 class="text-4xl font-extrabold text-primary-container mb-6">Water Damage Restoration</h2>
+<p class="text-on-surface-variant mb-8 leading-relaxed">
+                            Water can cause permanent structural damage within hours. Our rapid response team uses industrial-grade equipment to mitigate loss and prevent secondary damage.
+                        </p>
+<ul class="space-y-4 mb-10">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<div>
+<span class="font-bold text-primary-container block">24/7 Emergency Extraction</span>
+<span class="text-sm text-on-surface-variant">Immediate removal of standing water to stop further penetration.</span>
+</div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<div>
+<span class="font-bold text-primary-container block">Structural Drying</span>
+<span class="text-sm text-on-surface-variant">Advanced dehumidification to pull moisture from deep within framing.</span>
+</div>
+</li>
+</ul>
+<button class="bg-secondary-container text-white px-8 py-4 rounded-full font-bold w-full md:w-auto shadow-md hover:scale-[1.02] transition-transform">Get Help Now</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Service: Fire & Smoke -->
+<section class="py-24 bg-surface">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid md:grid-cols-12 gap-12 items-center">
+<div class="md:col-span-5">
+<h2 class="text-4xl font-extrabold text-primary-container mb-6">Fire &amp; Smoke Damage</h2>
+<p class="text-on-surface-variant mb-8 leading-relaxed">
+                            Restoring a home after a fire requires specialized knowledge of soot chemistry and structural integrity. We handle the cleanup so you can focus on recovery.
+                        </p>
+<ul class="space-y-4 mb-10">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<div>
+<span class="font-bold text-primary-container block">Soot &amp; Smoke Removal</span>
+<span class="text-sm text-on-surface-variant">Precision cleaning of delicate surfaces and specialized HVAC deodorization.</span>
+</div>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<div>
+<span class="font-bold text-primary-container block">Structural Cleaning</span>
+<span class="text-sm text-on-surface-variant">Removing acidic residues to prevent permanent etching and staining.</span>
+</div>
+</li>
+</ul>
+<button class="bg-primary-container text-white px-8 py-4 rounded-full font-bold w-full md:w-auto shadow-md hover:scale-[1.02] transition-transform">Get Help Now</button>
+</div>
+<div class="md:col-span-7">
+<div class="relative">
+<img class="w-full h-[500px] object-cover rounded-[2rem] shadow-2xl" data-alt="Interior of a house with fire damage being meticulously cleaned by a professional in protective gear, contrast between charred area and cleaned area." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxF8q9JQyBd52tkqmhjWZqimhFRz6rT_TGMfdvfy6grENUlO1194inC4hmlAL2vMdlyChYUl1s1xlWWOcmKPH5PzgS2Bo35fo3kpOeabjIIjC4Urtj-c-I-X7eAVJee-aSD3NJ1RAOkC4M0jyvdofkdhfjBQS3ilUJDVqaD-mbxwtivFUGz6p8xnRPkwoh_hY7FRxeor_lA8ZT1HOXkQc7nNx3NXvqQ-dXb26P9pBd6AfVteR21rhPhW2v5JGtAYeDOx3v9HC3Zv-s"/>
+<div class="absolute -bottom-6 -right-6 w-48 h-48 bg-secondary-container/10 backdrop-blur-xl rounded-full -z-10"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Service: Mold Remediation -->
+<section class="py-24 bg-surface-container-low mb-20">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid md:grid-cols-12 gap-12 items-center">
+<div class="md:col-span-7 order-2 md:order-1">
+<div class="grid grid-cols-2 gap-4">
+<img class="w-full h-80 object-cover rounded-3xl" data-alt="Macro photo of mold spores under a microscope, scientific aesthetic, clean laboratory background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATWwn9-aTE7VjMB7OTSEYdGHBnynjlykfqBOM-nfps5mysL9SYxMoPzt0Kxs5xTOfJqaJMp_zxgJOxrIkNCkZfwHd2qkc0nJb-RarYr447YIYRZFNYt-01aT_XOn82vs4RhtY_KOftGGwoTd8bidgRtVccp7TV4AFqpT9nq9lPs3G0VVKbAUZpeaIIdqA6LYk1URj5XP_8wgTkksiAmTrtMlAxwmYhNpwR8cNqdBONX-uK8Q-ltIdkEPktR7M6_oLlwidFkZWu60PP"/>
+<img class="w-full h-80 object-cover rounded-3xl mt-12" data-alt="Restoration specialist performing air quality test in a clean attic space with HEPA filtration unit nearby." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2I2uRVCbeZXkXX_DD21ZYrgunEkBVuvl0Q8rA-ksOagiEEfy-Z18VGs8EqOAlEL5SKOTD40MAKh3s72XBC2upe2phY509DtUe2yZh08UwlbhU9Uq675LMUDd00ZgSZT8cC9GuW70IHWbpfhKY02SjP1k34g7qJPBBOWd8tlKjTwOW9XouXFtAGzwJGjA1yDc4nkEv6bY5kSJx2YVoa8-bqUlf7M9KH0JlLxSzXyhxWVDbBnLPw-Q2tpFvTeCGCRrCDNyy6Q5eRlDl"/>
+</div>
+</div>
+<div class="md:col-span-5 order-1 md:order-2">
+<h2 class="text-4xl font-extrabold text-primary-container mb-6">Mold Removal &amp; Remediation</h2>
+<p class="text-on-surface-variant mb-8 leading-relaxed">
+                            Mold thrives on hidden moisture. Our certified experts identify the source, contain the spread, and restore your home to a healthy environment.
+                        </p>
+<div class="space-y-6 mb-10">
+<div class="bg-surface-container-lowest p-6 rounded-2xl">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-secondary">air</span>
+<span class="font-bold text-primary-container">Air Quality Testing</span>
+</div>
+<p class="text-sm text-on-surface-variant">Baseline testing and post-remediation verification to ensure breathable air.</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-2xl">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-secondary">security</span>
+<span class="font-bold text-primary-container">Containment &amp; Removal</span>
+</div>
+<p class="text-sm text-on-surface-variant">Negative air pressure and HEPA filtration to prevent cross-contamination.</p>
+</div>
+</div>
+<button class="bg-secondary-container text-white px-8 py-4 rounded-full font-bold w-full md:w-auto shadow-md hover:scale-[1.02] transition-transform">Get Help Now</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Bento Grid: Why Choose Us -->
+<section class="py-24 max-w-7xl mx-auto px-6">
+<h2 class="text-3xl font-extrabold text-center text-primary-container mb-16">The iRestorationpros Advantage</h2>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div class="md:col-span-2 bg-primary-container text-white p-10 rounded-[2rem] flex flex-col justify-between overflow-hidden relative">
+<div class="z-10">
+<h3 class="text-2xl font-bold mb-4">Insurance Direct Billing</h3>
+<p class="text-slate-300 leading-relaxed">We handle the paperwork and direct coordination with your insurance carrier to minimize out-of-pocket stress.</p>
+</div>
+<span class="material-symbols-outlined text-9xl absolute -bottom-8 -right-8 opacity-10">receipt_long</span>
+</div>
+<div class="bg-surface-container-low p-8 rounded-[2rem]">
+<span class="material-symbols-outlined text-secondary text-4xl mb-6">timer</span>
+<h3 class="text-xl font-bold text-primary-container mb-2">45 Min Response</h3>
+<p class="text-on-surface-variant text-sm">Fastest local dispatch time in the industry.</p>
+</div>
+<div class="bg-surface-container-high p-8 rounded-[2rem]">
+<span class="material-symbols-outlined text-secondary text-4xl mb-6">license</span>
+<h3 class="text-xl font-bold text-primary-container mb-2">Certified Techs</h3>
+<p class="text-on-surface-variant text-sm">Fully licensed, bonded, and IICRC certified teams.</p>
+</div>
+<div class="bg-surface-container-high p-8 rounded-[2rem]">
+<span class="material-symbols-outlined text-secondary text-4xl mb-6">support_agent</span>
+<h3 class="text-xl font-bold text-primary-container mb-2">24/7 Support</h3>
+<p class="text-on-surface-variant text-sm">Real humans on the phone, day or night.</p>
+</div>
+<div class="md:col-span-3 bg-secondary-container text-white p-10 rounded-[2rem] flex items-center justify-between">
+<div>
+<h3 class="text-3xl font-extrabold mb-2">Facing an Emergency?</h3>
+<p class="font-medium text-on-secondary-container opacity-80">Call our direct hotline for immediate dispatch.</p>
+</div>
+<a class="bg-white text-secondary-container px-10 py-5 rounded-full font-black text-xl hover:scale-105 transition-transform shadow-lg" href="tel:8005550199">
+                        (800) 555-0199
+                    </a>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-[#F6F2F8] dark:bg-slate-950 full-width py-12 px-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto w-full">
+<div class="flex flex-col gap-4">
+<span class="text-lg font-black text-[#0A2342] dark:text-white">iRestorationpros</span>
+<p class="text-on-surface-variant text-sm leading-relaxed">The Calm Authority in restoration services. Providing expert care when your home needs it most.</p>
+</div>
+<div class="flex flex-col gap-3">
+<span class="font-bold text-primary-container mb-2">Services</span>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Water Damage</a>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Fire &amp; Smoke</a>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Mold Remediation</a>
+</div>
+<div class="flex flex-col gap-3">
+<span class="font-bold text-primary-container mb-2">Company</span>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Privacy Policy</a>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Terms of Service</a>
+<a class="text-[#44474E] dark:text-slate-400 hover:text-[#0A2342] hover:translate-x-1 transition-transform duration-200" href="#">Contact Us</a>
+</div>
+<div class="flex flex-col gap-3">
+<span class="font-bold text-primary-container mb-2">Areas Served</span>
+<span class="text-[#44474E] dark:text-slate-400">Los Angeles</span>
+<span class="text-[#44474E] dark:text-slate-400">Riverside</span>
+<span class="text-[#44474E] dark:text-slate-400">Orange County</span>
+</div>
+</div>
+<div class="max-w-7xl mx-auto w-full mt-12 pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row justify-between items-center gap-4">
+<span class="text-sm text-on-surface-variant">© 2024 iRestorationpros. 24/7 Emergency Referral Service.</span>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-on-surface-variant">social_leaderboard</span>
+<span class="material-symbols-outlined text-on-surface-variant">share</span>
+</div>
+</div>
+</footer>
+</body></html>
