@@ -47,15 +47,15 @@ export const CONFIG = {
   sites: {
     authority: {
       name: "findrestorationpros",
-      url: "https://findrestorationpros.com",
-      username: "YOUR_WP_USERNAME",
-      appPassword: "YOUR_WP_APPLICATION_PASSWORD", // format: xxxx xxxx xxxx xxxx
+      url: process.env.WP_AUTHORITY_URL || "https://findrestorationpros.com",
+      username: process.env.WP_AUTHORITY_USERNAME || "",
+      appPassword: process.env.WP_AUTHORITY_PASSWORD || "",
     },
     leadCapture: {
       name: "irestorationpros",
-      url: "https://irestorationpros.com",
-      username: "YOUR_WP_USERNAME",
-      appPassword: "YOUR_WP_APPLICATION_PASSWORD",
+      url: process.env.WP_LEADCAPTURE_URL || "https://irestorationpros.com",
+      username: process.env.WP_LEADCAPTURE_USERNAME || "",
+      appPassword: process.env.WP_LEADCAPTURE_PASSWORD || "",
     }
   },
 
@@ -63,9 +63,9 @@ export const CONFIG = {
   // ANTHROPIC — console.anthropic.com → API Keys
   // ----------------------------------------------------------
   anthropic: {
-    apiKey: "YOUR_ANTHROPIC_API_KEY",
-    model: "claude-opus-4-5",          // best for content generation
-    contentModel: "claude-sonnet-4-5", // faster/cheaper for bulk pages
+    apiKey: process.env.ANTHROPIC_API_KEY || "",
+    model: "claude-sonnet-4-6",          // best for content generation
+    contentModel: "claude-sonnet-4-6", // faster/cheaper for bulk pages
   },
 
   // ----------------------------------------------------------
@@ -93,7 +93,7 @@ export const CONFIG = {
   // Used for DALL-E bulk image generation
   // ----------------------------------------------------------
   openai: {
-    apiKey: "YOUR_OPENAI_API_KEY",
+    apiKey: process.env.OPENAI_API_KEY || "",
     imageModel: "dall-e-3",
     imageSize: "1792x1024", // landscape for hero images
   },
@@ -103,9 +103,9 @@ export const CONFIG = {
   // Free tier: 25GB storage, 25GB bandwidth/mo
   // ----------------------------------------------------------
   cloudinary: {
-    cloudName: "YOUR_CLOUD_NAME",
-    apiKey: "YOUR_CLOUDINARY_API_KEY",
-    apiSecret: "YOUR_CLOUDINARY_API_SECRET",
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+    apiKey: process.env.CLOUDINARY_API_KEY || "",
+    apiSecret: process.env.CLOUDINARY_API_SECRET || "",
     folder: "restoration-sites",
   },
 
@@ -126,19 +126,21 @@ export const CONFIG = {
   },
 
   // ----------------------------------------------------------
-  // ZAPIER — zapier.com (used for lead routing webhooks)
-  // Create a Zap: Webhooks → Email/SMS to buyer
+  // MAKE.COM — make.com (used for lead routing webhooks)
+  // Create a scenario: Webhooks → Email/SMS to buyer
   // ----------------------------------------------------------
-  zapier: {
-    leadWebhookUrl: "YOUR_ZAPIER_WEBHOOK_URL",
+  make: {
+    leadWebhookUrl: process.env.MAKE_WEBHOOK_URL || "",
+    webhookSecret: process.env.MAKE_WEBHOOK_SECRET || "",
   },
 
   // ----------------------------------------------------------
   // CALLRAIL — callrail.com → Integrations → API
   // ----------------------------------------------------------
   callRail: {
-    apiKey: "YOUR_CALLRAIL_API_KEY",
-    accountId: "YOUR_CALLRAIL_ACCOUNT_ID",
+    apiKey: process.env.CALLRAIL_API_KEY || "",
+    accountId: process.env.CALLRAIL_ACCOUNT_ID || "",
+    trackingNumber: process.env.CALLRAIL_TRACKING_NUMBER || "(855) 999-0000",
   },
 
   // ----------------------------------------------------------

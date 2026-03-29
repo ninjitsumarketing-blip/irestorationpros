@@ -39,7 +39,7 @@ function isDuplicate(phone) {
   // WHY: Even this temporary store shouldn't hold raw phone numbers
   const phoneHash = crypto
     .createHash("sha256")
-    .update(phone + process.env.ZAPIER_WEBHOOK_SECRET)
+    .update(phone + process.env.MAKE_WEBHOOK_SECRET)
     .digest("hex");
 
   const lastSeen = recentLeads.get(phoneHash);
@@ -146,7 +146,7 @@ export async function processLeadSubmission(rawData, ipAddress) {
 
   // --- STEP 6: Send to buyer via signed webhook ---
   try {
-    await sendToZapier(lead);
+    await sendToMake(lead);
     logger.info(`Lead accepted and sent: ${lead.id}`);
     result.accepted = true;
     result.leadId = lead.id;
@@ -160,12 +160,12 @@ export async function processLeadSubmission(rawData, ipAddress) {
 }
 
 // ----------------------------------------------------------
-// ZAPIER WEBHOOK SENDER WITH SIGNATURE
+// MAKE.COM WEBHOOK SENDER WITH SIGNATURE
 // ----------------------------------------------------------
-async function sendToZapier(lead) {
+async function sendToMake(lead) {
   const { body, headers } = signWebhookPayload(lead);
 
-  const res = await fetch(CONFIG.zapier.leadWebhookUrl, {
+  const res = await fetch(CONFIG.make.leadWebhookUrl, {
     method: "POST",
     headers,
     body,
@@ -174,7 +174,7 @@ async function sendToZapier(lead) {
   });
 
   if (!res.ok) {
-    throw new Error(`Zapier webhook failed: HTTP ${res.status}`);
+    throw new Error(`Make.com webhook failed: HTTP ${res.status}`);
   }
 
   return res;
