@@ -1,0 +1,6 @@
+.env
+config/google-service-account.json
+node_modules/
+logs/
+*.log
+.DS_Store

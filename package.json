@@ -1,0 +1,25 @@
+{
+  "name": "restoration-lead-gen-system",
+  "version": "1.0.0",
+  "description": "Automated SEO lead gen system for restoration companies",
+  "type": "module",
+  "scripts": {
+    "test-wp": "node scripts/wp-publisher.js",
+    "test-gsc": "node scripts/gsc-reader.js",
+    "test-image": "node scripts/image-generator.js",
+    "generate-page": "node scripts/city-page-generator.js",
+    "generate-dry": "node scripts/city-page-generator.js --dry-run",
+    "run-weekly": "node scripts/orchestrator.js",
+    "single-page": "node scripts/city-page-generator.js --city"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "openai": "^4.47.0",
+    "googleapis": "^140.0.0",
+    "cloudinary": "^2.2.0",
+    "dotenv": "^16.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
