@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary": "#003853",
+              "on-primary-fixed-variant": "#173bab",
+              "secondary": "#0058be",
+              "on-secondary-fixed": "#001a42",
+              "on-primary-container": "#a8b8ff",
+              "on-background": "#0b1c30",
+              "surface-container-low": "#eff4ff",
+              "surface-container": "#e5eeff",
+              "surface-bright": "#f8f9ff",
+              "tertiary-fixed": "#c9e6ff",
+              "primary-fixed-dim": "#b8c4ff",
+              "secondary-container": "#2170e4",
+              "error-container": "#ffdad6",
+              "surface-dim": "#cbdbf5",
+              "secondary-fixed-dim": "#adc6ff",
+              "on-error-container": "#93000a",
+              "primary": "#00288e",
+              "on-surface-variant": "#444653",
+              "surface-container-highest": "#d3e4fe",
+              "on-primary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "surface-container-high": "#dce9ff",
+              "surface": "#f8f9ff",
+              "on-tertiary": "#ffffff",
+              "on-tertiary-fixed-variant": "#004c6e",
+              "primary-fixed": "#dde1ff",
+              "tertiary-container": "#005074",
+              "on-secondary-container": "#fefcff",
+              "surface-variant": "#d3e4fe",
+              "background": "#f8f9ff",
+              "error": "#ba1a1a",
+              "on-tertiary-container": "#68c4ff",
+              "on-error": "#ffffff",
+              "inverse-primary": "#b8c4ff",
+              "surface-tint": "#3755c3",
+              "surface-container-lowest": "#ffffff",
+              "on-surface": "#0b1c30",
+              "on-secondary-fixed-variant": "#004395",
+              "on-tertiary-fixed": "#001e2f",
+              "tertiary-fixed-dim": "#89ceff",
+              "secondary-fixed": "#d8e2ff",
+              "primary-container": "#1e40af",
+              "outline": "#757684",
+              "on-secondary": "#ffffff",
+              "outline-variant": "#c4c5d5",
+              "inverse-surface": "#213145",
+              "on-primary-fixed": "#001453"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
+        h1, h2, h3, .font-headline { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 backdrop-blur-xl shadow-sm">
+<div class="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
+<div class="text-xl font-extrabold text-blue-900 tracking-tighter font-headline">
+                Restoration Direct
+            </div>
+<div class="hidden md:flex space-x-8 items-center font-headline font-bold tracking-tight">
+<a class="text-blue-700 border-b-2 border-blue-700 pb-1" href="#">Find Pros</a>
+<a class="text-slate-600 hover:text-blue-600 transition-colors duration-200" href="#">Services</a>
+<a class="text-slate-600 hover:text-blue-600 transition-colors duration-200" href="#">Emergency</a>
+<a class="text-slate-600 hover:text-blue-600 transition-colors duration-200" href="#">About</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary hover:bg-primary-container text-on-primary px-6 py-2 rounded-lg font-headline font-bold text-sm transition-all duration-200">
+                    List Your Business
+                </button>
+</div>
+</div>
+<div class="bg-slate-100 h-px w-full"></div>
+</nav>
+<main class="pt-24 pb-20 max-w-7xl mx-auto px-8">
+<!-- Hero / Header Section -->
+<header class="mb-12">
+<nav class="flex mb-4 text-sm text-on-surface-variant font-label tracking-wide uppercase">
+<span>Home</span>
+<span class="mx-2 text-outline-variant">/</span>
+<span class="text-primary font-bold">Directory</span>
+</nav>
+<h1 class="text-5xl font-extrabold text-on-background tracking-tight mb-4">
+                All Verified Restoration Professionals
+            </h1>
+<p class="text-lg text-on-surface-variant max-w-2xl leading-relaxed">
+                Connect with IICRC-certified experts specializing in water, fire, and mold recovery. Every professional in our directory undergoes a 20-point vetting process.
+            </p>
+</header>
+<div class="flex flex-col lg:flex-row gap-12">
+<!-- Sidebar Filters -->
+<aside class="w-full lg:w-72 flex-shrink-0">
+<div class="sticky top-28 space-y-8 bg-surface-container-low p-8 rounded-xl">
+<div>
+<h3 class="font-headline font-bold text-lg mb-4 text-primary">Service Type</h3>
+<div class="space-y-3">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="rounded-sm border-outline-variant text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors">Water Mitigation</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors">Fire Damage Repair</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors">Mold Remediation</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-secondary focus:ring-secondary" type="checkbox"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors">Storm Restoration</span>
+</label>
+</div>
+</div>
+<div class="pt-6 border-t border-outline-variant/20">
+<h3 class="font-headline font-bold text-lg mb-4 text-primary">Rating</h3>
+<div class="space-y-3">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="border-outline-variant text-secondary focus:ring-secondary" name="rating" type="radio"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors flex items-center">
+                                    4.5+ Stars
+                                    <span class="ml-1 material-symbols-outlined text-sm text-yellow-500" style="font-variation-settings: 'FILL' 1;">star</span>
+</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="border-outline-variant text-secondary focus:ring-secondary" name="rating" type="radio"/>
+<span class="text-on-surface-variant group-hover:text-on-surface transition-colors flex items-center">
+                                    4.0+ Stars
+                                    <span class="ml-1 material-symbols-outlined text-sm text-yellow-500" style="font-variation-settings: 'FILL' 1;">star_half</span>
+</span>
+</label>
+</div>
+</div>
+<div class="pt-6 border-t border-outline-variant/20">
+<h3 class="font-headline font-bold text-lg mb-4 text-primary">Distance</h3>
+<input class="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-secondary" type="range"/>
+<div class="flex justify-between mt-2 text-xs font-label text-outline uppercase tracking-widest">
+<span>5 Miles</span>
+<span>50 Miles</span>
+</div>
+</div>
+<button class="w-full py-3 bg-surface-container-highest text-primary font-headline font-bold rounded-lg hover:bg-surface-container-high transition-colors">
+                        Apply Filters
+                    </button>
+</div>
+</aside>
+<!-- Main Content Grid -->
+<div class="flex-grow">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Pro Card 1 -->
+<div class="group relative bg-surface-container-lowest p-6 rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-on-surface/5 border-l-2 border-transparent hover:border-secondary overflow-hidden">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 bg-surface-container-low rounded-lg flex items-center justify-center p-2">
+<img alt="Logo" class="w-full h-full object-contain mix-blend-multiply" data-alt="minimalist professional logo for a restoration company named Vanguard featuring abstract structural blue lines" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvKb9gMfcGy2EEFpU14r3h-x9triAonktbDqJFqa79d3htPiV379o_43XEVbwoCPiTxqaEwlxKjJNLae17CYK1H7sKQeqqH4r1h34cJDGfkXwAupIVvMYmta4FmdEIIi3q3_7Id-0HbidxnQ0-hJxHwdaXNDEWLRFcsuXD8M8M1xtE5aO7puJQHXTgvA2dxGxel10pW_K_1Xv1ip6Qwmpe4u9pgW5-3XstomgMZkQQCj6DyI74f0_SdmNpI1Bm9QKpcuLHRcBWjgJx"/>
+</div>
+<div>
+<h3 class="font-headline font-bold text-xl text-on-background group-hover:text-secondary transition-colors">Vanguard Recovery Group</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-sm font-bold text-on-surface">4.9</span>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="text-xs text-outline font-label uppercase tracking-tighter">(128 Reviews)</span>
+</div>
+</div>
+</div>
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Verified</span>
+</div>
+<div class="space-y-4">
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Flood Mitigation</span>
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Structure Drying</span>
+</div>
+<div class="flex items-center justify-between text-sm py-3 border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-base">location_on</span>
+<span>2.4 miles away</span>
+</div>
+<button class="text-secondary font-bold hover:underline flex items-center gap-1 group/btn">
+                                    View Profile 
+                                    <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Pro Card 2 -->
+<div class="group relative bg-surface-container-lowest p-6 rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-on-surface/5 border-l-2 border-transparent hover:border-secondary overflow-hidden">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 bg-surface-container-low rounded-lg flex items-center justify-center p-2">
+<img alt="Logo" class="w-full h-full object-contain mix-blend-multiply" data-alt="architectural restoration company logo featuring a shield and droplet icon in deep navy and professional blue" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrUbxMiJQMkINwhJi02KScBXsKpxTya9DZ6Eq_hmlISNHOMIDnszfNvDpC35beR1cnTXqOtIQJYYEb4r9vksMCUqtzQRNAsYJCp-jIsMlI0XP58fBsP5Pn7WFCUfSXvk9biH35tQLFg56O6Ol3OIuAlkkFG_-snxC4_Y7fzMjYnEi4ijbsN-pci4j8QvE0bjyOln_SDQR1GsA03XcCWL2SD4yqhFnk0WHXXQPmWI-Um0F6OU4s6QPZDRT2q_RIpyep6R5LfD5u5rmZ"/>
+</div>
+<div>
+<h3 class="font-headline font-bold text-xl text-on-background group-hover:text-secondary transition-colors">Arc Restoration &amp; Build</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-sm font-bold text-on-surface">4.8</span>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star_half</span>
+</div>
+<span class="text-xs text-outline font-label uppercase tracking-tighter">(94 Reviews)</span>
+</div>
+</div>
+</div>
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Verified</span>
+</div>
+<div class="space-y-4">
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Mold Defense</span>
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Post-Fire Cleanup</span>
+</div>
+<div class="flex items-center justify-between text-sm py-3 border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-base">location_on</span>
+<span>5.1 miles away</span>
+</div>
+<button class="text-secondary font-bold hover:underline flex items-center gap-1 group/btn">
+                                    View Profile 
+                                    <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Pro Card 3 -->
+<div class="group relative bg-surface-container-lowest p-6 rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-on-surface/5 border-l-2 border-transparent hover:border-secondary overflow-hidden">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 bg-surface-container-low rounded-lg flex items-center justify-center p-2">
+<img alt="Logo" class="w-full h-full object-contain mix-blend-multiply" data-alt="modern corporate restoration logo for Summit Pros featuring a peak mountain shaped by geometric clean lines" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCas4HOjKhIm6k-4CQRtM6cuV2KVw0Az1Ydgb0ZShw85cLrk52Me4qD_0Xgb8vbtW6LQlq60B3Lpc-NKRDaLQmc07aMNXbBtyM5i-wDLt3_VCDVKcweBfye2R-hBFhSqfcsKkeq_p0uqeswiesS1xwybVNeQzREUEOhQ8J8XVcjJ-olTUedPMSZwnYNPmjSe7ZLnTA_KAdzOF8EIN6DaEC_nr22grJvcnCCiFl55Xv8eiakqd4UKsMuxt8uk_s46B2o100nxJAFyPNB"/>
+</div>
+<div>
+<h3 class="font-headline font-bold text-xl text-on-background group-hover:text-secondary transition-colors">Summit Restoration Pros</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-sm font-bold text-on-surface">4.7</span>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm">star</span>
+</div>
+<span class="text-xs text-outline font-label uppercase tracking-tighter">(215 Reviews)</span>
+</div>
+</div>
+</div>
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Verified</span>
+</div>
+<div class="space-y-4">
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Storm Response</span>
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">24/7 Dispatch</span>
+</div>
+<div class="flex items-center justify-between text-sm py-3 border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-base">location_on</span>
+<span>8.2 miles away</span>
+</div>
+<button class="text-secondary font-bold hover:underline flex items-center gap-1 group/btn">
+                                    View Profile 
+                                    <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Pro Card 4 -->
+<div class="group relative bg-surface-container-lowest p-6 rounded-xl transition-all duration-300 hover:shadow-2xl hover:shadow-on-surface/5 border-l-2 border-transparent hover:border-secondary overflow-hidden">
+<div class="flex items-start justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 bg-surface-container-low rounded-lg flex items-center justify-center p-2">
+<img alt="Logo" class="w-full h-full object-contain mix-blend-multiply" data-alt="premium restoration logo with an uppercase E and abstract roof line in navy and silver tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf09mMsaTEzC6zG_2rJVf1ky-pk-nT9cBpmR8exL24XIlfFZh9eCyOzNEaTemvjTS733yrcZOYcLsh6zqxouhfbp0_pL32jjYJNO_2bV8_tr4fu5_K21bU1Iw6H0lSUXrgz1yQN28STrOOuWBVniz6YHEaMm_dDgHAxd6vGDxM6Wz4LwDXEU8gH0KRPp3dsHwvBeQVgV4d_4m-A4ldpveFLbmidp6KBseqEaAp5ixPnzQUtUThPYsBkKOg-ZrkGt7dR0NwJ-rDEcUz"/>
+</div>
+<div>
+<h3 class="font-headline font-bold text-xl text-on-background group-hover:text-secondary transition-colors">Elite Environmental</h3>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-sm font-bold text-on-surface">5.0</span>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="text-xs text-outline font-label uppercase tracking-tighter">(42 Reviews)</span>
+</div>
+</div>
+</div>
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">Verified</span>
+</div>
+<div class="space-y-4">
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Biohazard Remediation</span>
+<span class="bg-surface-container px-3 py-1 rounded text-xs font-semibold text-secondary">Mold Testing</span>
+</div>
+<div class="flex items-center justify-between text-sm py-3 border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-base">location_on</span>
+<span>12.7 miles away</span>
+</div>
+<button class="text-secondary font-bold hover:underline flex items-center gap-1 group/btn">
+                                    View Profile 
+                                    <span class="material-symbols-outlined text-sm group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Load More Section -->
+<div class="mt-16 flex flex-col items-center gap-6">
+<div class="h-px w-24 bg-surface-variant"></div>
+<button class="flex items-center gap-3 px-10 py-4 bg-primary text-on-primary font-headline font-bold rounded-lg hover:shadow-xl hover:scale-[1.02] transition-all">
+                        Load More Professionals
+                        <span class="material-symbols-outlined">expand_more</span>
+</button>
+<p class="text-sm text-outline font-label tracking-wide uppercase">Showing 4 of 342 Verified Pros</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full border-t border-slate-200 bg-slate-50">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 py-12 max-w-7xl mx-auto gap-6">
+<div class="flex flex-col gap-2">
+<div class="font-manrope font-bold text-lg text-blue-900">Restoration Direct</div>
+<p class="font-inter text-sm text-slate-500">© 2024 Restoration Direct. The Architectural Guardian of Property Recovery.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="text-slate-500 hover:text-blue-700 transition-all font-inter text-sm" href="#">Terms of Service</a>
+<a class="text-slate-500 hover:text-blue-700 transition-all font-inter text-sm" href="#">Privacy Policy</a>
+<a class="text-slate-500 hover:text-blue-700 transition-all font-inter text-sm" href="#">Contractor Portal</a>
+<a class="text-slate-500 hover:text-blue-700 transition-all font-inter text-sm" href="#">Support</a>
+<a class="text-slate-500 hover:text-blue-700 transition-all font-inter text-sm" href="#">IICRC Standards</a>
+</div>
+</div>
+</footer>
+</body></html>

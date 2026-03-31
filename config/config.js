@@ -79,12 +79,12 @@ export const CONFIG = {
   google: {
     serviceAccountPath: "./config/google-service-account.json",
     gscSiteUrls: {
-      authority: "https://findrestorationpros.com/",
-      leadCapture: "https://irestorationpros.com/",
+      authority: "sc-domain:findrestorationpros.com",
+      leadCapture: "sc-domain:irestorationpros.com",
     },
     ga4PropertyIds: {
-      authority: "YOUR_GA4_PROPERTY_ID",     // format: 123456789
-      leadCapture: "YOUR_GA4_PROPERTY_ID",
+      authority: process.env.GA4_PROPERTY_ID_AUTHORITY || "",
+      leadCapture: process.env.GA4_PROPERTY_ID_LEADCAPTURE || "",
     }
   },
 
@@ -150,6 +150,54 @@ export const CONFIG = {
   dataForSeo: {
     username: "YOUR_DATAFORSEO_EMAIL",
     password: "YOUR_DATAFORSEO_PASSWORD",
+  },
+
+  // ----------------------------------------------------------
+  // YELP FUSION API — yelp.com/developers/v3/manage_app
+  // Free tier: 5,000 requests/day
+  // ----------------------------------------------------------
+  yelp: {
+    apiKey: process.env.YELP_API_KEY || "",
+    searchUrl: "https://api.yelp.com/v3/businesses/search",
+    reviewsUrl: "https://api.yelp.com/v3/businesses/{id}/reviews",
+    rateLimit: 5, // requests per second to stay under free tier
+  },
+
+  // ----------------------------------------------------------
+  // GOOGLE PLACES API (New) — separate from service account
+  // Used for place search and worst-3 review lookup
+  // ----------------------------------------------------------
+  googlePlaces: {
+    apiKey: process.env.GOOGLE_PLACES_API_KEY || "",
+    searchUrl: "https://places.googleapis.com/v1/places:searchText",
+    detailsUrl: "https://places.googleapis.com/v1/places/{id}",
+  },
+
+  // ----------------------------------------------------------
+  // FINDRESTORATIONPROS.COM — directory site config
+  // ----------------------------------------------------------
+  frp: {
+    makeWebhookUrl: process.env.FRP_MAKE_WEBHOOK_URL || "",
+    seedCities: [
+      "Los Angeles, CA", "San Diego, CA", "San Jose, CA", "San Francisco, CA",
+      "Fresno, CA", "Sacramento, CA", "Long Beach, CA", "Oakland, CA",
+      "Bakersfield, CA", "Anaheim, CA", "Santa Ana, CA", "Riverside, CA",
+      "Stockton, CA", "Irvine, CA", "Chula Vista, CA", "Fremont, CA",
+      "San Bernardino, CA", "Modesto, CA", "Fontana, CA", "Moreno Valley, CA",
+      "Glendale, CA", "Huntington Beach, CA", "Santa Clarita, CA", "Garden Grove, CA",
+      "Oceanside, CA", "Rancho Cucamonga, CA", "Santa Rosa, CA", "Ontario, CA",
+      "Elk Grove, CA", "Corona, CA", "Salinas, CA", "Torrance, CA",
+      "Pomona, CA", "Escondido, CA", "Sunnyvale, CA", "Pasadena, CA",
+      "Hayward, CA", "Palmdale, CA", "Visalia, CA", "Simi Valley, CA",
+      "Concord, CA", "Roseville, CA", "Thousand Oaks, CA", "Victorville, CA",
+      "El Monte, CA", "Inglewood, CA", "Downey, CA", "Costa Mesa, CA", "Murrieta, CA",
+    ],
+    searchTerms: [
+      "water damage restoration",
+      "mold remediation",
+      "fire damage restoration",
+      "flood restoration",
+    ],
   },
 
   // ----------------------------------------------------------

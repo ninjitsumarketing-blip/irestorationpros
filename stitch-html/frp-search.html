@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#e1e3e4",
+              "primary-fixed": "#d5e3ff",
+              "tertiary": "#002504",
+              "on-tertiary-container": "#5ead5c",
+              "inverse-surface": "#2e3132",
+              "primary-fixed-dim": "#a7c8ff",
+              "on-error": "#ffffff",
+              "on-error-container": "#93000a",
+              "on-secondary-container": "#602a00",
+              "on-surface-variant": "#43474f",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#ffb68b",
+              "secondary-fixed": "#ffdbc8",
+              "surface-container-low": "#f3f4f5",
+              "on-primary-container": "#799dd6",
+              "tertiary-fixed-dim": "#88d982",
+              "surface-tint": "#3a5f94",
+              "on-tertiary": "#ffffff",
+              "on-surface": "#191c1d",
+              "secondary": "#994700",
+              "background": "#f8f9fa",
+              "tertiary-fixed": "#a3f69c",
+              "inverse-on-surface": "#f0f1f2",
+              "on-secondary-fixed-variant": "#753400",
+              "primary": "#001e40",
+              "on-primary": "#ffffff",
+              "primary-container": "#003366",
+              "outline-variant": "#c3c6d1",
+              "on-primary-fixed": "#001b3c",
+              "surface": "#f8f9fa",
+              "error": "#ba1a1a",
+              "error-container": "#ffdad6",
+              "surface-container-high": "#e7e8e9",
+              "on-tertiary-fixed-variant": "#005312",
+              "surface-container-highest": "#e1e3e4",
+              "on-primary-fixed-variant": "#1f477b",
+              "inverse-primary": "#a7c8ff",
+              "outline": "#737780",
+              "on-tertiary-fixed": "#002204",
+              "surface-container": "#edeeef",
+              "surface-dim": "#d9dadb",
+              "on-secondary-fixed": "#321200",
+              "surface-bright": "#f8f9fa",
+              "secondary-container": "#fc8127",
+              "on-background": "#191c1d",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-container": "#003d0b"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .tonal-shift-bg {
+        background: linear-gradient(180deg, rgba(243, 244, 245, 0.8) 0%, rgba(237, 238, 239, 0.8) 100%);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body antialiased">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm dark:shadow-none">
+<div class="flex items-center justify-between px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-blue-900 dark:text-blue-100 active:scale-95 duration-200" data-icon="menu">menu</button>
+<h1 class="font-manrope font-bold tracking-tight text-xl font-extrabold text-blue-900 dark:text-white tracking-tighter">Restoration Guard</h1>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<nav class="flex gap-6 text-sm font-semibold">
+<a class="text-blue-900 dark:text-white font-bold" href="#">Explore</a>
+<a class="text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors px-2 py-1 rounded" href="#">Emergency</a>
+<a class="text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors px-2 py-1 rounded" href="#">Saved</a>
+</nav>
+<button class="material-symbols-outlined text-blue-900 dark:text-blue-100" data-icon="search">search</button>
+</div>
+<div class="md:hidden">
+<button class="material-symbols-outlined text-blue-900 dark:text-blue-100" data-icon="search">search</button>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-7xl mx-auto">
+<!-- Hero Search Section -->
+<section class="mb-12">
+<h2 class="font-headline text-4xl font-extrabold text-on-surface tracking-tight mb-6">Find Expert Responders</h2>
+<!-- Omni Search Bar -->
+<div class="relative group">
+<div class="flex items-center bg-surface-container-lowest rounded-lg p-2 shadow-sm border border-outline-variant/15 focus-within:ring-2 focus-within:ring-surface-tint/40 transition-all duration-300">
+<span class="material-symbols-outlined px-3 text-outline" data-icon="location_on">location_on</span>
+<input class="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline/60 font-medium" placeholder="Search by zip code or city..." type="text"/>
+<button class="bg-primary text-on-primary px-6 py-2 rounded font-semibold text-sm hover:bg-primary-container transition-colors duration-200">SEARCH</button>
+</div>
+</div>
+</section>
+<div class="flex flex-col lg:flex-row gap-12">
+<!-- Filter Sidebar -->
+<aside class="w-full lg:w-72 space-y-8">
+<div>
+<h3 class="font-headline text-sm font-bold uppercase tracking-wider text-outline mb-4">Service Type</h3>
+<div class="space-y-3">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="rounded-sm border-outline-variant text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+<span class="text-on-surface group-hover:text-primary transition-colors">Water Damage</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+<span class="text-on-surface group-hover:text-primary transition-colors">Fire &amp; Smoke</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+<span class="text-on-surface group-hover:text-primary transition-colors">Mold Remediation</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded-sm border-outline-variant text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+<span class="text-on-surface group-hover:text-primary transition-colors">Biohazard</span>
+</label>
+</div>
+</div>
+<div>
+<h3 class="font-headline text-sm font-bold uppercase tracking-wider text-outline mb-4">Distance Range</h3>
+<input class="w-full h-1.5 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary" type="range"/>
+<div class="flex justify-between mt-2 text-xs font-semibold text-outline">
+<span>5 miles</span>
+<span>50+ miles</span>
+</div>
+</div>
+<div class="p-6 bg-surface-container rounded-lg border border-outline-variant/10">
+<div class="flex items-center gap-2 text-secondary font-bold mb-2">
+<span class="material-symbols-outlined" data-icon="emergency_share">emergency_share</span>
+<span class="text-xs uppercase tracking-widest">Urgent Need?</span>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed mb-4">Get dispatched to the nearest verified responder in under 15 minutes.</p>
+<button class="w-full bg-secondary-container text-on-secondary-fixed py-2 rounded text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity">Quick Dispatch</button>
+</div>
+</aside>
+<!-- Results List -->
+<div class="flex-1">
+<div class="flex justify-between items-end mb-8 border-b border-outline-variant/10 pb-4">
+<p class="text-sm font-medium text-on-surface-variant"><span class="text-on-surface font-bold">14</span> Professionals found near <span class="text-primary font-bold">New York, NY</span></p>
+<div class="flex items-center gap-2 text-sm font-bold text-primary cursor-pointer">
+<span>Sort: Recommended</span>
+<span class="material-symbols-outlined" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</div>
+</div>
+<!-- Company Cards Bento-ish Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Card 1 -->
+<div class="group bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+<div class="h-48 overflow-hidden relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Modern high-tech industrial drying equipment in a clean white-walled room with professional lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVHnuFVa4BN2LALW5FiJ3hvMWoZjljW-AJZKi6jy7wQ69tK1yaUi2MPQHmyCYCZ3wCoOzUMZZRYmTellgE_vM3Li5dvEG0UkLXlah0M7KEM8Qqwtr8AX-wg_Or4ovzcTeeuMFxeKbY48lB98PvehzkKAQyUmyy8-Mhmw12ahWIjL5RU4bOL9E1qj9lrRaaiAPWB-iIHB8YLZSpEWka0ElRT15UGpGpbLIRMeIztaGEdsw2mjMYIgpJR3Vs-DtTZsT6Lcoy61EsPLM"/>
+<div class="absolute top-4 left-4">
+<span class="bg-tertiary-fixed-dim text-on-tertiary-fixed px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="verified" data-weight="fill">verified</span> Verified
+                                </span>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-headline text-xl font-bold text-on-surface leading-tight">Vanguard Restoration NYC</h3>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-lg" data-icon="star" data-weight="fill">star</span>
+<span class="font-headline font-bold">4.9</span>
+</div>
+</div>
+<p class="text-xs text-outline font-semibold uppercase tracking-wider mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="distance">distance</span> 1.2 miles away
+                            </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Water</span>
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Fire</span>
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Mold</span>
+</div>
+<div class="mt-auto flex gap-3">
+<button class="flex-1 bg-primary text-on-primary py-3 rounded text-xs font-bold uppercase tracking-widest hover:bg-primary-container transition-colors">Book Now</button>
+<button class="w-12 h-12 flex items-center justify-center border border-outline-variant/30 rounded text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="phone">phone</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="group bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+<div class="h-48 overflow-hidden relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Team of professional restoration experts in blue uniforms analyzing structural damage with thermal cameras" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq7afUa775lFWB6hyphuXIoeWjIbchdnMu3-mD-DCt8b47bYt_QmXa0smjoAqU5V9KsgL37-EmUPRGLSW951ZJD067botSQJpmk0uOR2aUjMX3Zi5FwrdGAtIXOpKau-BBjYDWlyM-rckbx3Z321bZaOFcUzFCBb0Gy7X7Bk8vFKcBCP-YC1nHt-Wo6nAZgYxaxKuLc8keqgHUEzdtDq96u7Dc7lI9zaegx42j0dwPhWujLFzgopCTc3xmXZPNb3iHnGtyDT2poXo"/>
+<div class="absolute top-4 left-4">
+<span class="bg-tertiary-fixed-dim text-on-tertiary-fixed px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="verified" data-weight="fill">verified</span> Verified
+                                </span>
+</div>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-headline text-xl font-bold text-on-surface leading-tight">Gotham Structural Guard</h3>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-lg" data-icon="star" data-weight="fill">star</span>
+<span class="font-headline font-bold">4.7</span>
+</div>
+</div>
+<p class="text-xs text-outline font-semibold uppercase tracking-wider mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="distance">distance</span> 2.8 miles away
+                            </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Fire</span>
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Smoke</span>
+</div>
+<div class="mt-auto flex gap-3">
+<button class="flex-1 bg-primary text-on-primary py-3 rounded text-xs font-bold uppercase tracking-widest hover:bg-primary-container transition-colors">Book Now</button>
+<button class="w-12 h-12 flex items-center justify-center border border-outline-variant/30 rounded text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="phone">phone</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="group bg-surface-container-lowest rounded-lg overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+<div class="h-48 overflow-hidden relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Interior of a luxury home under restoration with protective floor coverings and heavy duty air scrubbers" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwaOWoA1MjIVJu89-Fz5W2wKjPMbJVUwkWz588o-NPJ8zb-iSCnhuCnj8SizrDqWYtThgUoRGlmOxGncdkmDzrKpok3BIk7GgpccUv1O_l4ZAPhLK2I0gzKn91AP24A20tVIK-8M0GZKj3HeRCVz1e5lL9Xo67W09CqfOkJMQPQz2jd2p7Lfywa__6hTAUWwxm19RS7ZM-PG9HWJBmYbtrlxXos0-Nszx7FxpnS2_n621454uh_9r3NhNeMsjiH8Yr-ZSnXh8ZMSA"/>
+</div>
+<div class="p-6 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-headline text-xl font-bold text-on-surface leading-tight">Blue Ribbon Remediation</h3>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-lg" data-icon="star" data-weight="fill">star</span>
+<span class="font-headline font-bold">4.5</span>
+</div>
+</div>
+<p class="text-xs text-outline font-semibold uppercase tracking-wider mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="distance">distance</span> 4.1 miles away
+                            </p>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Mold</span>
+<span class="bg-surface-container text-on-surface-variant text-[10px] px-2 py-1 rounded font-bold uppercase">Biohazard</span>
+</div>
+<div class="mt-auto flex gap-3">
+<button class="flex-1 bg-primary text-on-primary py-3 rounded text-xs font-bold uppercase tracking-widest hover:bg-primary-container transition-colors">Book Now</button>
+<button class="w-12 h-12 flex items-center justify-center border border-outline-variant/30 rounded text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="phone">phone</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Map Integration Card (Asymmetric Layout) -->
+<div class="md:col-span-1 group bg-surface-container rounded-lg overflow-hidden border border-outline-variant/10 flex flex-col">
+<div class="flex-1 min-h-[300px] relative">
+<div class="absolute inset-0 bg-slate-200" data-location="New York City" style="">
+<!-- Map Placeholder Placeholder -->
+<img class="w-full h-full object-cover" data-alt="A clean, minimalist vector-style map of New York City streets with modern blue and orange pin drops" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQBh9Bwq28OfoX_3Xa2HbGT8yuUt3vBDOLryqMqCHl6Jd_GixsPtfSD0wg4KAH2K_PAnYv0PmHe9AGQ8ZejLBzyG6HhKWSJoGvN5epAqMP_C9LUWdoWnJ6yJubXwsAjkQcSkKlQrMg_uExn4IKijUm4X_5hQzTwLkDwDKHbFRVBvX752Bm3DXUDJmzVcYQPfWZaAsaWXk55UkRPNG5433NS2dSv1Hl6-XYcDi2xDUHQ43kdwdaLOZOojqgsr2Wtm0XzZsar3R48-A"/>
+</div>
+<div class="absolute inset-0 bg-primary/10 pointer-events-none"></div>
+<button class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest px-6 py-3 rounded shadow-lg font-bold text-xs uppercase tracking-widest text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="map">map</span> View Map
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-3 pb-safe bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-[0_-4px_12px_rgba(0,0,0,0.05)] border-t border-slate-200/20 z-50 md:hidden">
+<a class="flex flex-col items-center justify-center text-orange-800 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 rounded-xl px-3 py-1" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-inter text-[10px] font-semibold uppercase tracking-wider">Explore</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-200 active:translate-y-0.5 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="emergency_share">emergency_share</span>
+<span class="font-inter text-[10px] font-semibold uppercase tracking-wider">Emergency</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-200 active:translate-y-0.5 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+<span class="font-inter text-[10px] font-semibold uppercase tracking-wider">Saved</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-200 active:translate-y-0.5 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-inter text-[10px] font-semibold uppercase tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>
