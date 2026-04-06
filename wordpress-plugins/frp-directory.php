@@ -134,7 +134,14 @@ function frp_register_meta_fields() {
     ];
 
     // Internal/billing fields — NOT exposed to the public REST API
-    $private_fields = [ 'contact_name', 'contact_email' ];
+    $private_fields = [
+        'contact_name', 'contact_email',
+        // Dispatch contact (used in contractor notifications — never public)
+        'dispatch_phone', 'dispatch_email', 'dispatch_contact_name',
+        // Billing contact (internal only — no card data stored)
+        'billing_contact_name', 'billing_contact_email',
+        'billing_address', 'billing_city', 'billing_state', 'billing_zip',
+    ];
     foreach ( $private_fields as $key ) {
         register_post_meta( 'restoration_pro', $key, [
             'show_in_rest'  => false,
@@ -373,6 +380,223 @@ function frp_zip_to_coords( $zip ) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// LEAD HELPERS — scoring, labels, token generation
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns human-readable service label from a service slug.
+ * Used for lead post titles and admin display.
+ * NOTE: frp_service_label() takes a comma-separated string and is
+ * used for restoration_pro CPT. This function takes a single slug — keep both.
+ * If new service slugs are added, update both maps.
+ */
+function frp_lead_service_label( $slug ) {
+    $map = [
+        'water-damage'      => 'Water Damage Restoration',
+        'fire-damage'       => 'Fire Damage Restoration',
+        'mold-remediation'  => 'Mold Remediation',
+        'storm-damage'      => 'Storm Damage Repair',
+        'sewage-cleanup'    => 'Sewage Cleanup',
+        'biohazard-cleanup' => 'Biohazard Cleanup',
+        'structural'        => 'Structural Restoration',
+    ];
+    return $map[ $slug ] ?? ucwords( str_replace( '-', ' ', (string) $slug ) );
+}
+
+/**
+ * Calculates lead score (0–90) from intake answers.
+ * Urgency: now=40, 24hrs=20, older=5
+ * Insurance: yes=30, not-sure=15, no=5
+ * Property type: commercial=20, residential=10
+ */
+function frp_calculate_lead_score( $urgency, $has_insurance, $property_type ) {
+    $urgency_pts = [ 'now' => 40, '24hrs' => 20, 'older' => 5 ];
+    $insurance_pts = [ 'yes' => 30, 'not-sure' => 15, 'no' => 5 ];
+    $property_pts  = [ 'commercial' => 20, 'residential' => 10 ];
+
+    $score  = $urgency_pts[ $urgency ]          ?? 5;
+    $score += $insurance_pts[ $has_insurance ]   ?? 15;
+    $score += $property_pts[ $property_type ]    ?? 10;
+
+    return min( 90, max( 0, $score ) );
+}
+
+/**
+ * Returns plain-text score label for SMS (no emoji — carrier-safe).
+ * Email templates can add emoji separately.
+ */
+function frp_lead_score_label( $score ) {
+    if ( $score >= 70 ) return '[HIGH] High Value Emergency';
+    if ( $score >= 40 ) return '[QUALIFIED] Qualified Lead';
+    return '[STANDARD] Standard Lead';
+}
+
+/**
+ * Generates a cryptographically random update token and its 1-hour expiry.
+ * Returns [ 'token' => string, 'expiry' => ISO-8601 string ]
+ */
+function frp_generate_lead_token() {
+    return [
+        'token'  => bin2hex( random_bytes( 16 ) ),
+        'expiry' => gmdate( 'c', time() + 3600 ),
+    ];
+}
+
+/**
+ * Finds up to 3 contractors to dispatch a lead to.
+ * Runs 5 tiers in sequence, stopping as soon as results are found:
+ *   Tier 1 — Paid pros, ZIP matches their service radius
+ *   Tier 2 — Paid pros, expanded 25-mile radius from lead ZIP
+ *   Tier 3 — Paid pros, expanded 50-mile radius from lead ZIP
+ *   Tier 4 — Free-tier pros, 50-mile radius (complimentary lead)
+ *   Tier 5 — No coverage
+ *
+ * Returns array with keys:
+ *   'pros'  => array of pro data (empty if no coverage)
+ *   'tier'  => string tier identifier
+ *   'has_coverage' => bool
+ */
+function frp_find_dispatch_pros( $zip, $service ) {
+    $lead_coords = frp_zip_to_coords( $zip );
+
+    // Base meta query — active listing + service match
+    $base_meta = [
+        'relation' => 'AND',
+        [
+            'key'     => 'listing_status',
+            'value'   => 'active',
+            'compare' => '=',
+        ],
+        [
+            'key'     => 'services',
+            'value'   => $service,
+            'compare' => 'LIKE',
+        ],
+    ];
+
+    // ── Tier 1: Paid pros, service_radius_miles match (or ZIP in zip_codes list) ──
+    $paid_meta = array_merge( $base_meta, [[
+        'key'     => 'is_paid_listing',
+        'value'   => '1',
+        'compare' => '=',
+    ]] );
+
+    $tier1 = frp_dispatch_query( $paid_meta, $lead_coords, null, $zip );
+    $tier1 = frp_filter_expired( $tier1 );
+
+    if ( ! empty( $tier1 ) ) {
+        return [ 'pros' => array_slice( $tier1, 0, 3 ), 'tier' => 'paid_zip', 'has_coverage' => true ];
+    }
+
+    // ── Tier 2: Paid pros, 25-mile radius ───────────────────────
+    $tier2 = frp_dispatch_query( $paid_meta, $lead_coords, 25 );
+    $tier2 = frp_filter_expired( $tier2 );
+
+    if ( ! empty( $tier2 ) ) {
+        return [ 'pros' => array_slice( $tier2, 0, 3 ), 'tier' => 'paid_25mi', 'has_coverage' => true ];
+    }
+
+    // ── Tier 3: Paid pros, 50-mile radius ───────────────────────
+    $tier3 = frp_dispatch_query( $paid_meta, $lead_coords, 50 );
+    $tier3 = frp_filter_expired( $tier3 );
+
+    if ( ! empty( $tier3 ) ) {
+        return [ 'pros' => array_slice( $tier3, 0, 3 ), 'tier' => 'paid_50mi', 'has_coverage' => true ];
+    }
+
+    // ── Tier 4: Free-tier pros, 50-mile radius ──────────────────
+    $tier4 = frp_dispatch_query( $base_meta, $lead_coords, 50 );
+    $tier4 = frp_filter_expired( $tier4 );
+
+    if ( ! empty( $tier4 ) ) {
+        return [ 'pros' => array_slice( $tier4, 0, 3 ), 'tier' => 'free_fallback', 'has_coverage' => true ];
+    }
+
+    // ── Tier 5: No coverage ──────────────────────────────────────
+    return [ 'pros' => [], 'tier' => 'no_coverage', 'has_coverage' => false ];
+}
+
+/**
+ * Runs a WP_Query to find restoration pros matching the given meta query.
+ * Filters by distance if $radius_miles is set (overrides pro's own service radius).
+ * Sorts by distance ascending, then google_rating descending.
+ *
+ * @param array      $meta_query  WP meta_query array
+ * @param array|null $lead_coords [lat, lng] of lead ZIP or null
+ * @param int|null   $radius_miles Force radius override; null = use each pro's own radius
+ * @param string     $zip         Lead ZIP code — used for explicit zip_codes list check (Tier 1 only)
+ * @return array     Array of ['post_id', 'distance', 'google_rating', 'dispatch_phone', 'dispatch_email', 'name']
+ */
+function frp_dispatch_query( $meta_query, $lead_coords, $radius_miles, $zip = '' ) {
+    $query = new WP_Query( [
+        'post_type'      => 'restoration_pro',
+        'posts_per_page' => 100,
+        'post_status'    => 'publish',
+        'meta_query'     => $meta_query,
+        'fields'         => 'ids',
+    ] );
+
+    $results = [];
+
+    foreach ( $query->posts as $id ) {
+        $lat = get_post_meta( $id, 'lat', true );
+        $lng = get_post_meta( $id, 'lng', true );
+
+        if ( ! frp_has_valid_coords( $lat, $lng ) ) continue;
+        if ( ! $lead_coords ) continue;
+
+        $distance = frp_haversine( $lead_coords[0], $lead_coords[1], (float) $lat, (float) $lng );
+
+        // Determine effective radius
+        if ( $radius_miles !== null ) {
+            // Forced radius (Tiers 2–4)
+            if ( $distance > $radius_miles ) continue;
+        } else {
+            // Tier 1: include pro if lead ZIP is in their zip_codes list OR within their service_radius_miles
+            $pro_radius = (int) get_post_meta( $id, 'service_radius_miles', true );
+            if ( $pro_radius <= 0 ) $pro_radius = 25;
+
+            $zip_codes   = get_post_meta( $id, 'zip_codes', true );
+            $zip_list    = $zip_codes ? array_map( 'trim', explode( ',', $zip_codes ) ) : [];
+            $in_zip_list = ! empty( $zip ) && in_array( $zip, $zip_list, true );
+
+            // Exclude if outside radius AND not explicitly listed
+            if ( $distance > $pro_radius && ! $in_zip_list ) continue;
+        }
+
+        $results[] = [
+            'post_id'        => $id,
+            'name'           => get_the_title( $id ),
+            'distance'       => round( $distance, 1 ),
+            'google_rating'  => (float) get_post_meta( $id, 'google_rating', true ),
+            'dispatch_phone' => get_post_meta( $id, 'dispatch_phone', true ),
+            'dispatch_email' => get_post_meta( $id, 'dispatch_email', true ),
+        ];
+    }
+
+    // Sort: distance ascending, then google_rating descending (matches frp_search_handler)
+    usort( $results, function( $a, $b ) {
+        if ( $a['distance'] !== $b['distance'] ) return $a['distance'] <=> $b['distance'];
+        return $b['google_rating'] <=> $a['google_rating'];
+    } );
+
+    return $results;
+}
+
+/**
+ * Filters out pros whose listing_expires date has passed.
+ * Accepts the array returned by frp_dispatch_query().
+ */
+function frp_filter_expired( $pros ) {
+    return array_filter( $pros, function( $pro ) {
+        $expires = get_post_meta( $pro['post_id'], 'listing_expires', true );
+        if ( ! $expires ) return true; // No expiry set = never expires
+        return strtotime( $expires ) >= current_time( 'timestamp' );
+    } );
+}
+
+// ─────────────────────────────────────────────────────────────
 // 3. REST ENDPOINT: /wp-json/frp/v1/search
 //    GET ?zip=90210&service=water-damage
 //    Returns array of matching companies, paid listings first.
@@ -436,8 +660,380 @@ function frp_register_rest_routes() {
             'path'    => [ 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ],
         ],
     ] );
+
+    // ── Lead capture — Route A: Create ──────────────────────────
+    register_rest_route( 'frp/v1', '/leads', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_lead_create_handler',
+        'permission_callback' => '__return_true',
+    ] );
+
+    // ── Lead capture — Route B: Update ──────────────────────────
+    register_rest_route( 'frp/v1', '/leads/(?P<id>\d+)', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_lead_update_handler',
+        'permission_callback' => '__return_true',
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
+
+// ─────────────────────────────────────────────────────────────
+// LEAD ROUTE A — Create Lead
+// POST /wp-json/frp/v1/leads
+// ─────────────────────────────────────────────────────────────
+function frp_lead_create_handler( WP_REST_Request $request ) {
+
+    // 1. Token validation
+    if ( ! defined( 'FRP_LEAD_SECRET' ) ) {
+        return new WP_Error( 'forbidden', 'Lead endpoint not configured.', [ 'status' => 403 ] );
+    }
+    $token = $request->get_header( 'X-FRP-Lead-Token' );
+    if ( ! $token || ! hash_equals( FRP_LEAD_SECRET, $token ) ) {
+        return new WP_Error( 'forbidden', 'Invalid token.', [ 'status' => 403 ] );
+    }
+
+    // 2. Rate limiting — 3 submissions per IP per 15 minutes
+    if ( ! frp_check_rate_limit( 'lead_create', 3, 15 * MINUTE_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many requests. Please try again shortly.', [ 'status' => 429 ] );
+    }
+
+    // 3. Sanitize and validate inputs
+    $valid_services = [ 'water-damage','mold-remediation','fire-damage','storm-damage','sewage-cleanup','structural','biohazard-cleanup' ];
+    $valid_urgency  = [ 'now', '24hrs', 'older' ];
+    $valid_property = [ 'residential', 'commercial' ];
+    $valid_insurance= [ 'yes', 'no', 'not-sure' ];
+    $valid_sources  = [ 'guided_flow', 'followup_modal', 'emergency_flow' ];
+
+    $source   = in_array( $request->get_param( 'source' ), $valid_sources, true )
+                    ? $request->get_param( 'source' ) : 'guided_flow';
+
+    // For emergency_flow, use defaults for scoring fields if not provided
+    $is_emergency = ( $source === 'emergency_flow' );
+
+    $raw_urgency  = $request->get_param( 'urgency' );
+    $raw_property = $request->get_param( 'property_type' );
+    $raw_insure   = $request->get_param( 'has_insurance' );
+
+    $urgency      = in_array( $raw_urgency, $valid_urgency, true )   ? $raw_urgency  : ( $is_emergency ? 'now'         : null );
+    $property     = in_array( $raw_property, $valid_property, true ) ? $raw_property : ( $is_emergency ? 'residential' : null );
+    $insurance    = in_array( $raw_insure, $valid_insurance, true )  ? $raw_insure   : ( $is_emergency ? 'not-sure'    : null );
+
+    $phone  = sanitize_text_field( $request->get_param( 'phone' ) ?? '' );
+    $zip    = sanitize_text_field( $request->get_param( 'zip' )   ?? '' );
+    $email  = sanitize_email( $request->get_param( 'email' )      ?? '' );
+    $service_raw = $request->get_param( 'service' ) ?? '';
+    $service = in_array( $service_raw, $valid_services, true ) ? $service_raw : '';
+    $page_url = esc_url_raw( $request->get_param( 'page_url' ) ?? '' );
+
+    // assigned_pro for follow-up modal
+    $assigned_pro = (int) ( $request->get_param( 'assigned_pro' ) ?? 0 );
+
+    // Phone is required (except followup_modal can supply email instead)
+    if ( ! $phone || ! preg_match( '/^\+?[\d\s\-().]{7,20}$/', $phone ) ) {
+        if ( $source !== 'followup_modal' || ! $email ) {
+            return new WP_Error( 'bad_request', 'A valid phone number is required.', [ 'status' => 400 ] );
+        }
+    }
+
+    if ( $zip && ! preg_match( '/^\d{5}$/', $zip ) ) {
+        return new WP_Error( 'bad_request', 'Invalid ZIP code.', [ 'status' => 400 ] );
+    }
+
+    if ( $email && ! is_email( $email ) ) {
+        $email = ''; // Silently clear invalid email rather than reject
+    }
+
+    if ( ! $service ) {
+        return new WP_Error( 'bad_request', 'A valid service type is required.', [ 'status' => 400 ] );
+    }
+
+    if ( ! $urgency || ! $property || ! $insurance ) {
+        return new WP_Error( 'bad_request', 'Urgency, property type, and insurance are required.', [ 'status' => 400 ] );
+    }
+
+    // 4. Scope: sanitize JSON blob if provided
+    $scope_raw = $request->get_param( 'scope' );
+    $scope_str = '';
+    if ( $scope_raw ) {
+        $decoded = is_array( $scope_raw ) ? $scope_raw : json_decode( $scope_raw, true );
+        if ( is_array( $decoded ) ) {
+            $clean_scope = [];
+            foreach ( $decoded as $k => $v ) {
+                $clean_scope[ sanitize_text_field( $k ) ] = sanitize_text_field( (string) $v );
+            }
+            $scope_str = wp_json_encode( $clean_scope );
+        }
+    }
+
+    // 5. Duplicate detection: same phone OR email, status=new, within 24 hours
+    $dup_id = frp_find_duplicate_lead( $phone, $email );
+    if ( $dup_id ) {
+        // Refresh token if needed
+        $existing_expiry = get_post_meta( $dup_id, 'lead_update_token_expiry', true );
+        if ( ! $existing_expiry || strtotime( $existing_expiry ) < time() ) {
+            $tok = frp_generate_lead_token();
+            update_post_meta( $dup_id, 'lead_update_token', $tok['token'] );
+            update_post_meta( $dup_id, 'lead_update_token_expiry', $tok['expiry'] );
+            $return_token = $tok['token'];
+        } else {
+            $return_token = get_post_meta( $dup_id, 'lead_update_token', true );
+        }
+        $has_coverage = ! empty( json_decode( get_post_meta( $dup_id, 'lead_assigned_pros', true ), true ) );
+        return rest_ensure_response( [
+            'success'           => true,
+            'lead_id'           => $dup_id,
+            'lead_update_token' => $return_token,
+            'has_coverage'      => $has_coverage,
+        ] );
+    }
+
+    // 6. Calculate score
+    $score = frp_calculate_lead_score( $urgency, $insurance, $property );
+
+    // 7. Generate update token
+    $tok = frp_generate_lead_token();
+
+    // 8. Build post title
+    $svc_label = frp_lead_service_label( $service );
+    $urg_labels = [ 'now' => 'Right Now', '24hrs' => 'Within 24hr', 'older' => 'Older' ];
+    if ( $zip ) {
+        $title = $svc_label . ' — ' . $zip . ' — ' . ( $urg_labels[ $urgency ] ?? $urgency );
+    } else {
+        $title = $svc_label . ' — ' . ( $phone ?: $email );
+    }
+
+    // 9. Create the post
+    $post_id = wp_insert_post( [
+        'post_type'   => 'frp_lead',
+        'post_status' => 'publish',
+        'post_title'  => $title,
+    ] );
+
+    if ( is_wp_error( $post_id ) || ! $post_id ) {
+        return new WP_Error( 'server_error', 'Could not save your request. Please try again.', [ 'status' => 500 ] );
+    }
+
+    // 10. Save all meta
+    $now = gmdate( 'c' );
+    $meta_map = [
+        'lead_email'               => $email,
+        'lead_phone'               => $phone,
+        'lead_zip'                 => $zip,
+        'lead_service'             => $service,
+        'lead_urgency'             => $urgency,
+        'lead_property_type'       => $property,
+        'lead_has_insurance'       => $insurance,
+        'lead_scope'               => $scope_str,
+        'lead_score'               => $score,
+        'lead_status'              => 'new',
+        'lead_source'              => $source,
+        'lead_page_url'            => $page_url,
+        'lead_update_token'        => $tok['token'],
+        'lead_update_token_expiry' => $tok['expiry'],
+        'date_submitted'           => $now,
+        'lead_make_sent'           => 0,
+    ];
+    if ( $assigned_pro ) {
+        $meta_map['lead_assigned_pros'] = wp_json_encode( [ $assigned_pro ] );
+    }
+    foreach ( $meta_map as $key => $value ) {
+        update_post_meta( $post_id, $key, $value );
+    }
+
+    // 11. Cascading dispatch (skip for followup_modal — pro already known)
+    $dispatch_result = [ 'pros' => [], 'tier' => 'no_coverage', 'has_coverage' => false ];
+    if ( $zip && $source !== 'followup_modal' ) {
+        $dispatch_result = frp_find_dispatch_pros( $zip, $service );
+    }
+
+    update_post_meta( $post_id, 'lead_assigned_pros', wp_json_encode(
+        array_column( $dispatch_result['pros'], 'post_id' )
+    ) );
+    update_post_meta( $post_id, 'dispatch_tier', $dispatch_result['tier'] );
+
+    // 12. Fire Make.com webhook (non-blocking)
+    frp_fire_lead_webhook( $post_id, $score, $dispatch_result, [
+        'phone'        => $phone,
+        'email'        => $email,
+        'zip'          => $zip,
+        'service'      => $service,
+        'urgency'      => $urgency,
+        'property'     => $property,
+        'insurance'    => $insurance,
+        'source'       => $source,
+        'date'         => $now,
+    ] );
+    update_post_meta( $post_id, 'lead_make_sent', 1 );
+
+    return rest_ensure_response( [
+        'success'           => true,
+        'lead_id'           => $post_id,
+        'lead_update_token' => $tok['token'],
+        'has_coverage'      => $dispatch_result['has_coverage'],
+    ] );
+}
+
+/**
+ * Checks for a recent duplicate lead by phone or email.
+ * Returns the existing post ID if found, false otherwise.
+ */
+function frp_find_duplicate_lead( $phone, $email ) {
+    // Guard early — need at least one identifier
+    if ( ! $phone && ! $email ) return false;
+
+    $twenty_four_hours_ago = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
+
+    $args = [
+        'post_type'      => 'frp_lead',
+        'posts_per_page' => 1,
+        'post_status'    => 'publish',
+        'fields'         => 'ids',
+        'date_query'     => [ [ 'after' => $twenty_four_hours_ago, 'inclusive' => true ] ],
+        'meta_query'     => [
+            'relation' => 'AND',
+            [
+                'key'     => 'lead_status',
+                'value'   => 'new',
+                'compare' => '=',
+            ],
+            [
+                'relation' => 'OR',
+                ...( $phone ? [[
+                    'key'     => 'lead_phone',
+                    'value'   => $phone,
+                    'compare' => '=',
+                ]] : [] ),
+                ...( $email ? [[
+                    'key'     => 'lead_email',
+                    'value'   => $email,
+                    'compare' => '=',
+                ]] : [] ),
+            ],
+        ],
+    ];
+
+    $results = get_posts( $args );
+    return ! empty( $results ) ? $results[0] : false;
+}
+
+/**
+ * Fires the Make.com webhook for a new lead (non-blocking).
+ * Uses FRP_MAKE_WEBHOOK constant from wp-config.php.
+ *
+ * @param int   $post_id         frp_lead post ID
+ * @param int   $score           Lead score 0–90
+ * @param array $dispatch_result From frp_find_dispatch_pros()
+ * @param array $lead_data       Raw intake fields
+ */
+function frp_fire_lead_webhook( $post_id, $score, $dispatch_result, $lead_data ) {
+    $webhook_url = defined( 'FRP_MAKE_WEBHOOK' ) ? FRP_MAKE_WEBHOOK
+                 : get_option( 'frp_make_webhook', '' );
+    if ( ! $webhook_url ) return;
+
+    $svc_label_map = [
+        'water-damage'      => 'Water Damage Restoration',
+        'fire-damage'       => 'Fire Damage Restoration',
+        'mold-remediation'  => 'Mold Remediation',
+        'storm-damage'      => 'Storm Damage Repair',
+        'sewage-cleanup'    => 'Sewage Cleanup',
+        'biohazard-cleanup' => 'Biohazard Cleanup',
+        'structural'        => 'Structural Restoration',
+    ];
+    $urg_label_map = [ 'now' => 'Right Now', '24hrs' => 'Within 24 Hours', 'older' => 'Older' ];
+    $ins_label_map = [ 'yes' => 'Yes', 'no' => 'No', 'not-sure' => 'Not Sure' ];
+    $prop_label_map = [ 'residential' => 'Residential', 'commercial' => 'Commercial' ];
+
+    // Build dispatched_pros array with dispatch contact fields
+    $pros_payload = [];
+    foreach ( $dispatch_result['pros'] as $pro ) {
+        $pros_payload[] = [
+            'pro_id'         => $pro['post_id'],
+            'name'           => $pro['name'],
+            'dispatch_phone' => $pro['dispatch_phone'] ?: '',
+            'dispatch_email' => $pro['dispatch_email'] ?: '',
+        ];
+    }
+
+    $payload = [
+        'event'            => 'new_lead',
+        'lead_id'          => $post_id,
+        'lead_score'       => $score,
+        'lead_score_label' => frp_lead_score_label( $score ),
+        'dispatch_tier'    => $dispatch_result['tier'],
+        'has_coverage'     => $dispatch_result['has_coverage'],
+        'phone'            => $lead_data['phone'],
+        'email'            => $lead_data['email'],
+        'zip'              => $lead_data['zip'],
+        'name'             => '',  // populated after Step 2
+        'address'          => '',  // populated after Step 2
+        'service'          => $svc_label_map[ $lead_data['service'] ] ?? $lead_data['service'],
+        'urgency'          => $urg_label_map[ $lead_data['urgency'] ] ?? $lead_data['urgency'],
+        'property_type'    => $prop_label_map[ $lead_data['property'] ] ?? $lead_data['property'],
+        'has_insurance'    => $ins_label_map[ $lead_data['insurance'] ] ?? $lead_data['insurance'],
+        'source'           => $lead_data['source'],
+        'date_submitted'   => $lead_data['date'],
+        'dispatched_pros'  => $pros_payload,
+        'site_url'         => get_site_url(),
+    ];
+
+    wp_remote_post( $webhook_url, [
+        'blocking' => false,
+        'timeout'  => 2,
+        'headers'  => [ 'Content-Type' => 'application/json' ],
+        'body'     => wp_json_encode( $payload ),
+    ] );
+}
+
+// ─────────────────────────────────────────────────────────────
+// LEAD ROUTE B — Update Lead (Step 2: name + address)
+// POST /wp-json/frp/v1/leads/{id}
+// ─────────────────────────────────────────────────────────────
+function frp_lead_update_handler( WP_REST_Request $request ) {
+
+    // 1. Token validation
+    if ( ! defined( 'FRP_LEAD_SECRET' ) ) {
+        return new WP_Error( 'forbidden', 'Endpoint not configured.', [ 'status' => 403 ] );
+    }
+    $header_token = $request->get_header( 'X-FRP-Lead-Token' );
+    if ( ! $header_token || ! hash_equals( FRP_LEAD_SECRET, $header_token ) ) {
+        return new WP_Error( 'forbidden', 'Invalid token.', [ 'status' => 403 ] );
+    }
+
+    // 2. Validate post ID
+    $post_id = (int) $request->get_param( 'id' );
+    $post    = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'frp_lead' || $post->post_status !== 'publish' ) {
+        return new WP_Error( 'not_found', 'Lead not found.', [ 'status' => 404 ] );
+    }
+
+    // 3. Verify update token (body param, not header)
+    $body_token = sanitize_text_field( $request->get_param( 'lead_update_token' ) ?? '' );
+    $stored_token  = get_post_meta( $post_id, 'lead_update_token', true );
+    $stored_expiry = get_post_meta( $post_id, 'lead_update_token_expiry', true );
+
+    if ( ! $stored_token || ! $body_token || ! hash_equals( $stored_token, $body_token ) ) {
+        return new WP_Error( 'forbidden', 'Invalid update token.', [ 'status' => 403 ] );
+    }
+
+    if ( $stored_expiry && strtotime( $stored_expiry ) < time() ) {
+        return new WP_Error( 'forbidden', 'Session expired. Please refresh and try again.', [ 'status' => 403 ] );
+    }
+
+    // 4. Sanitize update fields
+    $name    = sanitize_text_field( $request->get_param( 'name' )    ?? '' );
+    $address = sanitize_text_field( $request->get_param( 'address' ) ?? '' );
+    $city    = sanitize_text_field( $request->get_param( 'city' )    ?? '' );
+
+    // 5. Update meta
+    if ( $name )    update_post_meta( $post_id, 'lead_name',    $name );
+    if ( $address ) update_post_meta( $post_id, 'lead_address', $address );
+    if ( $city )    update_post_meta( $post_id, 'lead_city',    $city );
+
+    return rest_ensure_response( [
+        'success' => true,
+        'lead_id' => $post_id,
+    ] );
+}
 
 function frp_publish_page_handler( WP_REST_Request $request ) {
     $slug           = $request->get_param( 'slug' );
@@ -951,6 +1547,17 @@ function frp_render_meta_box( $post ) {
             'date_seeded'         => [ 'Date Seeded', 'text' ],
             'last_synced'         => [ 'Last Synced', 'text' ],
         ],
+        '🏢 Onboarding & Billing (Internal — Not Public)' => [
+            'dispatch_contact_name' => [ 'Dispatch Contact Name', 'text' ],
+            'dispatch_phone'        => [ 'Dispatch Phone (used in lead notifications)', 'text' ],
+            'dispatch_email'        => [ 'Dispatch Email (used in lead notifications)', 'email' ],
+            'billing_contact_name'  => [ 'Billing Contact Name', 'text' ],
+            'billing_contact_email' => [ 'Billing Contact Email', 'email' ],
+            'billing_address'       => [ 'Billing Street Address', 'text' ],
+            'billing_city'          => [ 'Billing City', 'text' ],
+            'billing_state'         => [ 'Billing State', 'text' ],
+            'billing_zip'           => [ 'Billing ZIP', 'text' ],
+        ],
     ];
 
     echo '<style>
@@ -1020,7 +1627,7 @@ function frp_save_meta_box( $post_id ) {
     foreach ( $_POST['frp_meta'] as $key => $raw ) {
         $key = sanitize_key( $key );
 
-        if ( $key === 'contact_email' ) {
+        if ( in_array( $key, [ 'contact_email', 'dispatch_email', 'billing_contact_email' ], true ) ) {
             $value = sanitize_email( $raw );
         } elseif ( $key === 'description' ) {
             $value = sanitize_textarea_field( $raw );
