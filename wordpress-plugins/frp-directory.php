@@ -893,6 +893,23 @@ function frp_find_duplicate_lead( $phone, $email ) {
 
     $twenty_four_hours_ago = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 
+    // Build OR clauses dynamically — avoid spread operator (PHP 7.x compat)
+    $or_clauses = [ 'relation' => 'OR' ];
+    if ( $phone ) {
+        $or_clauses[] = [
+            'key'     => 'lead_phone',
+            'value'   => $phone,
+            'compare' => '=',
+        ];
+    }
+    if ( $email ) {
+        $or_clauses[] = [
+            'key'     => 'lead_email',
+            'value'   => $email,
+            'compare' => '=',
+        ];
+    }
+
     $args = [
         'post_type'      => 'frp_lead',
         'posts_per_page' => 1,
@@ -906,19 +923,7 @@ function frp_find_duplicate_lead( $phone, $email ) {
                 'value'   => 'new',
                 'compare' => '=',
             ],
-            [
-                'relation' => 'OR',
-                ...( $phone ? [[
-                    'key'     => 'lead_phone',
-                    'value'   => $phone,
-                    'compare' => '=',
-                ]] : [] ),
-                ...( $email ? [[
-                    'key'     => 'lead_email',
-                    'value'   => $email,
-                    'compare' => '=',
-                ]] : [] ),
-            ],
+            $or_clauses,
         ],
     ];
 
