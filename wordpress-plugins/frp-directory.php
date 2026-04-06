@@ -8,6 +8,16 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ─────────────────────────────────────────────────────────────
+// INJECT FRP_LEAD_TOKEN — outputs window.FRP_LEAD_TOKEN on every
+// page so the frontend JS can authenticate against /frp/v1/leads
+// without needing a per-page Elementor snippet.
+// ─────────────────────────────────────────────────────────────
+add_action( 'wp_head', function() {
+    $token = defined( 'FRP_LEAD_SECRET' ) ? FRP_LEAD_SECRET : '';
+    echo '<script>window.FRP_LEAD_TOKEN=' . json_encode( $token ) . ';</script>' . "\n";
+} );
+
+// ─────────────────────────────────────────────────────────────
 // RATE LIMITER — transient-based, per IP
 // ─────────────────────────────────────────────────────────────
 function frp_check_rate_limit( $action, $limit, $window ) {
