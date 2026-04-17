@@ -5,6 +5,11 @@
 //
 // Usage: node scripts/verify-staging.mjs
 // Reads credentials from `.env.test` (NOT `.env`).
+//
+// Note: this script reads only the 7 env vars it actively probes. The Stripe
+// triad (STRIPE_TEST_*) and Turnstile sitekey (TURNSTILE_TEST_SITEKEY) are
+// declared in .env.test.example for downstream tasks (1.7 Stripe webhook,
+// Cloudflare widget rendering) — validated there, not here.
 
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
@@ -54,12 +59,36 @@ function record(n, label, ok, detail) {
   console.log(`[${n}/7] ${pad(label)} ${mark} ${detail}`);
 }
 
+// WP Application Passwords are displayed as six space-separated 4-char groups
+// (e.g. "aBcD eFgH iJkL mNoP qRsT uVwX"). Operators paste them verbatim.
+// Stripping whitespace here prevents "status 401 — check creds" false negatives
+// when the creds are actually correct but contain display-format spaces.
 const basic = (user, pass) =>
-  'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
+  'Basic ' + Buffer.from(`${user}:${String(pass).replace(/\s+/g, '')}`).toString('base64');
+
+// Per-check fetch timeout. Staging DNS/origin hiccups are common during
+// provisioning; don't wait Node's default ~300s before reporting ❌.
+const FETCH_TIMEOUT_MS = 15_000;
+function timed(init = {}) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  return {
+    init: { ...init, signal: ac.signal },
+    done: () => clearTimeout(timer),
+  };
+}
+async function tfetch(url, init = {}) {
+  const t = timed(init);
+  try {
+    return await fetch(url, t.init);
+  } finally {
+    t.done();
+  }
+}
 
 async function check1_wpReachable() {
   try {
-    const res = await fetch(`${FRP_STAGING_URL}/wp-json/wp/v2/types`);
+    const res = await tfetch(`${FRP_STAGING_URL}/wp-json/wp/v2/types`);
     if (res.status !== 200) {
       record(1, 'WP REST reachable', false, `status ${res.status}`);
       return null;
@@ -76,7 +105,7 @@ async function check1_wpReachable() {
 
 async function checkUserMe(n, label, user, pass, shouldBeAdmin) {
   try {
-    const res = await fetch(
+    const res = await tfetch(
       `${FRP_STAGING_URL}/wp-json/wp/v2/users/me?context=edit`,
       { headers: { Authorization: basic(user, pass) } }
     );
@@ -103,7 +132,7 @@ async function checkUserMe(n, label, user, pass, shouldBeAdmin) {
 
 async function check4_mailhog() {
   try {
-    const res = await fetch(FRP_MAILHOG_URL);
+    const res = await tfetch(FRP_MAILHOG_URL);
     if (res.status === 200) {
       record(4, 'MailHog UI', true, `${FRP_MAILHOG_URL} returned 200`);
     } else {
@@ -117,7 +146,7 @@ async function check4_mailhog() {
 async function check5_stripeWebhook() {
   const url = `${FRP_STAGING_URL}/wp-json/frp/v1/stripe/webhook`;
   try {
-    const res = await fetch(url, {
+    const res = await tfetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
@@ -161,7 +190,7 @@ async function check7_turnstile() {
       secret: TURNSTILE_TEST_SECRET,
       response: 'XXXX.DUMMY.TOKEN.XXXX',
     });
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    const res = await tfetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form,
@@ -171,7 +200,7 @@ async function check7_turnstile() {
       record(7, 'Turnstile test keys', true, `siteverify success=true`);
     } else {
       const codes = body && body['error-codes'] ? body['error-codes'].join(',') : 'unknown';
-      record(7, 'Turnstile test keys', false, `siteverify success=false (${codes})`);
+      record(7, 'Turnstile test keys', false, `status ${res.status} / siteverify success=false (${codes})`);
     }
   } catch (err) {
     record(7, 'Turnstile test keys', false, `connection error: ${err.message}`);
