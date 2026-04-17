@@ -123,6 +123,8 @@ async function check5_stripeWebhook() {
       body: '{}',
     });
     // 404 = handler not built yet (Task 1.7). 400/401 = handler exists, rejected unsigned.
+    // Any other status is unexpected — fail loudly so we don't silently approve
+    // (e.g.) a 200 that would indicate the webhook accepted an unsigned payload.
     if (res.status === 404) {
       record(5, 'Stripe webhook endpoint', true, `returned 404 (expected until Task 1.7)`);
     } else if (res.status === 400 || res.status === 401) {
@@ -130,7 +132,7 @@ async function check5_stripeWebhook() {
     } else if (res.status >= 500) {
       record(5, 'Stripe webhook endpoint', false, `server error ${res.status}`);
     } else {
-      record(5, 'Stripe webhook endpoint', true, `returned ${res.status}`);
+      record(5, 'Stripe webhook endpoint', false, `unexpected status ${res.status} — expected 404/400/401`);
     }
   } catch (err) {
     record(5, 'Stripe webhook endpoint', false, `connection error: ${err.message}`);
