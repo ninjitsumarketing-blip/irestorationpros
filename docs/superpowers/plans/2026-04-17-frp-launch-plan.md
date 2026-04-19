@@ -61,6 +61,10 @@ Before any other task in this plan runs. No code here; the deliverable is provis
 - [ ] Cloudflare Turnstile widget provisioned (test keys: sitekey `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA` which always pass — documented at https://developers.cloudflare.com/turnstile/troubleshooting/testing/)
 - [ ] SiteGround/hosting layer confirmed to sit behind Cloudflare (so `CF-Connecting-IP` header reaches PHP)
 
+**Tracked deferrals from Task 0.0 (2026-04-19 run):** the following two checks are intentionally ⏭️ skipped on staging and MUST be resolved before the listed downstream task:
+1. **Subscriber app password** — `verify-staging.mjs [3/7]`. Provision a `test-subscriber` user (role=Subscriber) + Application Password; paste into `.env.test`. **Blocks Task 1.3** (auth-gating tests for `/frp/v1/apply` require a non-admin fixture).
+2. **Cloudflare-in-front on staging** — `verify-staging.mjs [6/7]`. Staging2 is currently direct-from-SiteGround; no `cf-ray`. Put staging behind CF (or accept the parity gap and re-enable the check as a hard-fail). **Blocks Task 2.2** (`CF-Connecting-IP` trust chain cannot be exercised without CF in front).
+
 **Acceptance:** A developer can run `curl https://staging.findrestorationpros.com/wp-json/wp/v2/types` and receive a 200 + JSON. MailHog UI is reachable at `https://staging.findrestorationpros.com/mailhog/` (or agreed URL). Stripe CLI `stripe listen --forward-to staging.findrestorationpros.com/wp-json/frp/v1/stripe/webhook` connects without error.
 
 **This task blocks all tests in Chunks 1–4.** If any task below reports a missing staging dependency, return here.
