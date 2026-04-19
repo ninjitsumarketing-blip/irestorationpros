@@ -16,11 +16,15 @@ import path from "path";
 // CORE WP API CLASS
 // ----------------------------------------------------------
 class WordPressPublisher {
-  constructor(site) {
-    this.site = CONFIG.sites[site];
-    this.baseUrl = `${this.site.url}/wp-json/wp/v2`;
+  constructor(siteKey) {
+    if (siteKey !== 'authority') {
+      throw new Error(`Unknown site "${siteKey}" — FRP is authority-only since iRP was retired 2026-04-17`);
+    }
+    const site = CONFIG.sites.authority;
+    this.site = site;
+    this.baseUrl = `${site.url}/wp-json/wp/v2`;
     this.authHeader = this._buildAuthHeader();
-    this.siteName = site;
+    this.siteName = siteKey;
   }
 
   _buildAuthHeader() {
@@ -395,10 +399,11 @@ export { WordPressPublisher };
 // CLI TEST — run directly to verify connection
 // node scripts/wp-publisher.js
 // ----------------------------------------------------------
-if (process.argv[1].includes("wp-publisher")) {
-  const publisher = new WordPressPublisher("leadCapture");
+import { fileURLToPath } from 'node:url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const publisher = new WordPressPublisher('authority');
   const pages = await publisher.getAllPages();
-  console.log(`\n✓ Connected to ${CONFIG.sites.leadCapture.url}`);
+  console.log(`\n✓ Connected to ${CONFIG.sites.authority.url}`);
   console.log(`  Found ${pages.length} published pages`);
   console.log(`  Sample pages:`);
   pages.slice(0, 5).forEach(p => console.log(`    - ${p.title} (${p.wordCount} words)`));
