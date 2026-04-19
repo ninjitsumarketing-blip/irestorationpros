@@ -222,8 +222,23 @@ function frp_register_meta_fields() {
         'type'          => 'string',
         'auth_callback' => function() { return current_user_can( 'edit_posts' ); },
     ] );
+
+    // User meta: binds a WP user to their restoration_pro CPT post.
+    register_meta( 'user', 'frp_pro_id', [
+        'type'          => 'integer',
+        'single'        => true,
+        'show_in_rest'  => false,
+        'auth_callback' => function() { return current_user_can( 'manage_options' ); },
+    ] );
 }
 add_action( 'init', 'frp_register_meta_fields' );
+
+// Returns the restoration_pro post ID bound to the current user, or 0.
+function frp_current_pro_id() {
+    $uid = get_current_user_id();
+    if ( ! $uid ) return 0;
+    return (int) get_user_meta( $uid, 'frp_pro_id', true );
+}
 
 // ─────────────────────────────────────────────────────────────
 // COORD VALIDATION — reject missing/zero coordinates
@@ -692,8 +707,50 @@ function frp_register_rest_routes() {
         'callback'            => 'frp_lead_update_handler',
         'permission_callback' => '__return_true',
     ] );
+
+    // ── Admin: bind WP user to a restoration_pro post ────────────
+    register_rest_route( 'frp/v1', '/admin/bind-pro-user', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_bind_handler',
+        'permission_callback' => function() { return current_user_can( 'manage_options' ); },
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
+
+function frp_admin_bind_handler( WP_REST_Request $r ) {
+    $login  = sanitize_user( (string) $r->get_param( 'user_login' ) );
+    $pro_id = (int) $r->get_param( 'pro_id' );
+    if ( ! $login ) {
+        return new WP_Error( 'bad_request', 'user_login required', [ 'status' => 400 ] );
+    }
+
+    $user = get_user_by( 'login', $login );
+    if ( ! $user ) {
+        $pass    = wp_generate_password( 24 );
+        $user_id = wp_insert_user( [
+            'user_login' => $login,
+            'user_pass'  => $pass,
+            'user_email' => $login . '@placeholder.invalid',
+            'role'       => 'restoration_pro',
+        ] );
+        if ( is_wp_error( $user_id ) ) return $user_id;
+    } else {
+        $user_id = $user->ID;
+        $user->set_role( 'restoration_pro' );
+    }
+
+    if ( $pro_id === 0 ) {
+        $pro_id = wp_insert_post( [
+            'post_type'   => 'restoration_pro',
+            'post_status' => 'draft',
+            'post_title'  => $login,
+        ] );
+        if ( is_wp_error( $pro_id ) ) return $pro_id;
+    }
+
+    update_user_meta( $user_id, 'frp_pro_id', $pro_id );
+    return rest_ensure_response( [ 'user_id' => $user_id, 'pro_id' => $pro_id ] );
+}
 
 // ─────────────────────────────────────────────────────────────
 // LEAD ROUTE A — Create Lead
@@ -1811,3 +1868,17 @@ function frp_flush_rewrites() {
     flush_rewrite_rules();
 }
 register_activation_hook( __FILE__, 'frp_flush_rewrites' );
+
+register_activation_hook( __FILE__, function() {
+    add_role( 'restoration_pro', 'Restoration Pro', [
+        'read' => true,
+    ] );
+} );
+
+// Ensure the role exists on every request until it is created in the DB.
+// No-ops once add_role has succeeded (WordPress ignores duplicate role slugs).
+add_action( 'init', function() {
+    if ( ! get_role( 'restoration_pro' ) ) {
+        add_role( 'restoration_pro', 'Restoration Pro', [ 'read' => true ] );
+    }
+} );
