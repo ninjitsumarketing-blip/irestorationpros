@@ -40,9 +40,10 @@ checkKeyRotation();
 export const CONFIG = {
 
   // ----------------------------------------------------------
-  // YOUR TWO WORDPRESS SITES
+  // WORDPRESS SITE — findrestorationpros.com
   // SiteGround → WP Admin → Users → Add New → Role: Editor
   // Generate Application Password under user profile
+  // irestorationpros.com retired 2026-04-17; see archive/
   // ----------------------------------------------------------
   sites: {
     authority: {
@@ -51,12 +52,6 @@ export const CONFIG = {
       username: process.env.WP_AUTHORITY_USERNAME || "",
       appPassword: process.env.WP_AUTHORITY_PASSWORD || "",
     },
-    leadCapture: {
-      name: "irestorationpros",
-      url: process.env.WP_LEADCAPTURE_URL || "https://irestorationpros.com",
-      username: process.env.WP_LEADCAPTURE_USERNAME || "",
-      appPassword: process.env.WP_LEADCAPTURE_PASSWORD || "",
-    }
   },
 
   // ----------------------------------------------------------
@@ -80,11 +75,9 @@ export const CONFIG = {
     serviceAccountPath: "./config/google-service-account.json",
     gscSiteUrls: {
       authority: "sc-domain:findrestorationpros.com",
-      leadCapture: "sc-domain:irestorationpros.com",
     },
     ga4PropertyIds: {
       authority: process.env.GA4_PROPERTY_ID_AUTHORITY || "",
-      leadCapture: process.env.GA4_PROPERTY_ID_LEADCAPTURE || "",
     }
   },
 
