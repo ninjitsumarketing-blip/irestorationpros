@@ -4,13 +4,9 @@
   "description": "Automated SEO lead gen system for restoration companies",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.mjs",
     "test-wp": "node scripts/wp-publisher.js",
-    "test-gsc": "node scripts/gsc-reader.js",
-    "test-image": "node scripts/image-generator.js",
-    "generate-page": "node scripts/city-page-generator.js",
-    "generate-dry": "node scripts/city-page-generator.js --dry-run",
-    "run-weekly": "node scripts/orchestrator.js",
-    "single-page": "node scripts/city-page-generator.js --city"
+    "test-image": "node scripts/image-generator.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
