@@ -214,6 +214,14 @@ function frp_register_meta_fields() {
             'auth_callback' => '__return_true',
         ] );
     }
+
+    // Test-harness fixture flag — allows smoke tests to tag and clean up seeded posts.
+    register_post_meta( 'restoration_pro', 'test_fixture', [
+        'show_in_rest'  => true,
+        'single'        => true,
+        'type'          => 'string',
+        'auth_callback' => function() { return current_user_can( 'edit_posts' ); },
+    ] );
 }
 add_action( 'init', 'frp_register_meta_fields' );
 
