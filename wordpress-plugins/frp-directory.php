@@ -1621,6 +1621,12 @@ function frp_claim_verify_handler( WP_REST_Request $r ) {
     $uid = get_current_user_id();
     if ( ! $uid ) {
         $email = (string) get_post_meta( $pro_id, 'contact_email', true );
+        if ( ! $email || ! is_email( $email ) ) {
+            // Listing has no valid on-file email — cannot create a WP user.
+            // This guard prevents wp_insert_user from receiving an invalid email
+            // and returning an undiagnosable WP_Error 500.
+            return new WP_Error( 'no_contact_email', 'Listing has no valid contact email on file.', [ 'status' => 500 ] );
+        }
         $user  = get_user_by( 'email', $email );
         if ( ! $user ) {
             $pass = wp_generate_password( 24 );
