@@ -1296,32 +1296,28 @@ function frp_contact_handler( WP_REST_Request $request ) {
 // ─────────────────────────────────────────────────────────────
 // APPLY HANDLER — creates pending restoration_pro CPT entry
 // ─────────────────────────────────────────────────────────────
-function frp_apply_handler( WP_REST_Request $request ) {
-    // Rate limit: 20 applications per IP per hour.
-    // 20 is intentionally loose enough for integration test suites (which hit the
-    // endpoint several times per run) while still blocking obvious automation.
-    // Tighten to 3–5 before launch once real traffic is in place.
-    if ( ! frp_check_rate_limit( 'apply', 20, HOUR_IN_SECONDS ) ) {
-        return new WP_Error( 'rate_limited', 'Too many applications; try later.', [ 'status' => 429 ] );
-    }
 
+/**
+ * Validate and sanitize /apply request params.
+ * @return array|WP_Error Validated applicant array or error.
+ */
+function frp_apply_validate( WP_REST_Request $r ) : array|WP_Error {
     $valid_services = [
         'water-damage', 'mold-remediation', 'fire-damage',
         'storm-damage', 'sewage-cleanup', 'structural', 'biohazard-cleanup',
     ];
 
-    $business = sanitize_text_field( (string) ( $request->get_param( 'business_name' ) ?? '' ) );
-    $contact  = sanitize_text_field( (string) ( $request->get_param( 'contact_name' )  ?? '' ) );
-    $email    = sanitize_email(      (string) ( $request->get_param( 'contact_email' )  ?? '' ) );
-    $phone    = sanitize_text_field( (string) ( $request->get_param( 'dispatch_phone' ) ?? '' ) );
-    $license  = sanitize_text_field( (string) ( $request->get_param( 'license_number' ) ?? '' ) );
-    $years    = absint( $request->get_param( 'years_in_business' ) ?? 0 );
-    $zips     = sanitize_text_field( (string) ( $request->get_param( 'service_area_zips' ) ?? '' ) );
-    $city     = sanitize_text_field( (string) ( $request->get_param( 'service_area_city' ) ?? '' ) );
-    $state    = strtoupper( sanitize_text_field( (string) ( $request->get_param( 'state' ) ?? '' ) ) );
-    $services_raw = (array) ( $request->get_param( 'services' ) ?? [] );
+    $business = sanitize_text_field( (string) ( $r->get_param( 'business_name' ) ?? '' ) );
+    $contact  = sanitize_text_field( (string) ( $r->get_param( 'contact_name' )  ?? '' ) );
+    $email    = sanitize_email(      (string) ( $r->get_param( 'contact_email' )  ?? '' ) );
+    $phone    = sanitize_text_field( (string) ( $r->get_param( 'dispatch_phone' ) ?? '' ) );
+    $license  = sanitize_text_field( (string) ( $r->get_param( 'license_number' ) ?? '' ) );
+    $years    = absint( $r->get_param( 'years_in_business' ) ?? 0 );
+    $zips     = sanitize_text_field( (string) ( $r->get_param( 'service_area_zips' ) ?? '' ) );
+    $city     = sanitize_text_field( (string) ( $r->get_param( 'service_area_city' ) ?? '' ) );
+    $state    = strtoupper( sanitize_text_field( (string) ( $r->get_param( 'state' ) ?? '' ) ) );
+    $services_raw = (array) ( $r->get_param( 'services' ) ?? [] );
 
-    // Required field validation
     if ( ! $business || ! $email || ! $phone || ! $state ) {
         return new WP_Error( 'bad_request', 'business_name, contact_email, dispatch_phone, state are required.', [ 'status' => 400 ] );
     }
@@ -1331,44 +1327,64 @@ function frp_apply_handler( WP_REST_Request $request ) {
     if ( ! preg_match( '/^\+?[\d\s\-().]{7,20}$/', $phone ) ) {
         return new WP_Error( 'bad_request', 'Invalid dispatch_phone.', [ 'status' => 400 ] );
     }
-
-    // Services whitelist — reject any unknown service slug
     $services = array_values( array_intersect( $services_raw, $valid_services ) );
     if ( ! empty( $services_raw ) && count( $services ) !== count( $services_raw ) ) {
         return new WP_Error( 'bad_request', 'One or more services are invalid.', [ 'status' => 400 ] );
     }
 
-    // Create the draft pro CPT entry
+    return compact( 'business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services' );
+}
+
+/**
+ * Insert a new restoration_pro draft from a validated applicant array.
+ * Sets joined_source = 'apply_new'.
+ * @param array $a Result of frp_apply_validate().
+ * @return array|WP_Error REST response shape or error.
+ */
+function frp_apply_insert_new( array $a ) : array|WP_Error {
     $pro_id = wp_insert_post( [
         'post_type'   => 'restoration_pro',
         'post_status' => 'draft',
-        'post_title'  => $business,
+        'post_title'  => $a['business'],
     ], true );
 
     if ( is_wp_error( $pro_id ) ) {
         return new WP_Error( 'insert_failed', $pro_id->get_error_message(), [ 'status' => 500 ] );
     }
 
-    update_post_meta( $pro_id, 'contact_name',      $contact );
-    update_post_meta( $pro_id, 'contact_email',      $email );
-    update_post_meta( $pro_id, 'dispatch_phone',     $phone );
-    update_post_meta( $pro_id, 'dispatch_email',     $email );
-    update_post_meta( $pro_id, 'license_number',     $license );
-    update_post_meta( $pro_id, 'years_in_business',  $years );
-    update_post_meta( $pro_id, 'zip_codes',          $zips );
-    update_post_meta( $pro_id, 'city',               $city );
-    update_post_meta( $pro_id, 'state',              $state );
-    update_post_meta( $pro_id, 'services',           implode( ',', $services ) );
+    update_post_meta( $pro_id, 'contact_name',      $a['contact'] );
+    update_post_meta( $pro_id, 'contact_email',      $a['email'] );
+    update_post_meta( $pro_id, 'dispatch_phone',     $a['phone'] );
+    update_post_meta( $pro_id, 'dispatch_email',     $a['email'] );
+    update_post_meta( $pro_id, 'license_number',     $a['license'] );
+    update_post_meta( $pro_id, 'years_in_business',  $a['years'] );
+    update_post_meta( $pro_id, 'zip_codes',          $a['zips'] );
+    update_post_meta( $pro_id, 'city',               $a['city'] );
+    update_post_meta( $pro_id, 'state',              $a['state'] );
+    update_post_meta( $pro_id, 'services',           implode( ',', $a['services'] ) );
     update_post_meta( $pro_id, 'listing_status',     'pending_review' );
     update_post_meta( $pro_id, 'listing_tier',       'free' );
     update_post_meta( $pro_id, 'is_paid_listing',    0 );
-    update_post_meta( $pro_id, 'joined_source',      'apply_form' );
+    update_post_meta( $pro_id, 'joined_source',      'apply_new' );
     update_post_meta( $pro_id, 'date_seeded',        gmdate( 'c' ) );
 
     // Fire notification (Task 1.9 will hook into this action for emails)
     do_action( 'frp_application_submitted', $pro_id );
 
-    return rest_ensure_response( [ 'application_id' => $pro_id, 'status' => 'pending_review' ] );
+    return [ 'application_id' => $pro_id, 'status' => 'pending_review' ];
+}
+
+function frp_apply_handler( WP_REST_Request $request ) {
+    // Rate limit: 20 applications per IP per hour.
+    // 20 is intentionally loose enough for integration test suites (which hit the
+    // endpoint several times per run) while still blocking obvious automation.
+    // Tighten to 3–5 before launch once real traffic is in place.
+    if ( ! frp_check_rate_limit( 'apply', 20, HOUR_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many applications; try later.', [ 'status' => 429 ] );
+    }
+    $applicant = frp_apply_validate( $request );
+    if ( is_wp_error( $applicant ) ) return $applicant;
+    return rest_ensure_response( frp_apply_insert_new( $applicant ) );
 }
 
 function frp_search_handler( WP_REST_Request $request ) {
