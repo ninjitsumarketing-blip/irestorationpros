@@ -54,7 +54,16 @@ function frp_register_cpt() {
         'supports'      => [ 'title', 'editor', 'thumbnail', 'custom-fields' ],
         'menu_icon'     => 'dashicons-businessman',
         'show_in_menu'  => true,
-        'map_meta_cap'  => true,  // prevents map_meta_cap notice in WP 6.1+
+        'capabilities'  => [
+            'edit_post'          => 'manage_options',
+            'edit_posts'         => 'manage_options',
+            'edit_others_posts'  => 'manage_options',
+            'publish_posts'      => 'manage_options',
+            'read_post'          => 'manage_options',
+            'read_private_posts' => 'manage_options',
+            'delete_post'        => 'manage_options',
+        ],
+        'map_meta_cap'  => true,
     ] );
 }
 add_action( 'init', 'frp_register_cpt' );
@@ -109,8 +118,16 @@ function frp_register_claim_review_cpt() {
         'show_in_rest'    => true,  // needed so REST API can return ticket objects
         'map_meta_cap'    => true,
         'supports'        => [ 'title', 'custom-fields' ],
-        'menu_icon'       => 'dashicons-clipboard',
-        'capability_type' => 'post',
+        'menu_icon'     => 'dashicons-clipboard',
+        'capabilities'  => [
+            'edit_post'          => 'manage_options',
+            'edit_posts'         => 'manage_options',
+            'edit_others_posts'  => 'manage_options',
+            'publish_posts'      => 'manage_options',
+            'read_post'          => 'manage_options',
+            'read_private_posts' => 'manage_options',
+            'delete_post'        => 'manage_options',
+        ],
     ] );
 }
 add_action( 'init', 'frp_register_claim_review_cpt' );

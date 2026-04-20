@@ -42,6 +42,32 @@
 - D6. Existing `FRP_LEAD_SECRET` global constant is **retired** entirely. Replaced by Turnstile + per-request nonce.
 - D7. Content generation for FRP moves from city×service pages to aggregate "best of" + contractor spotlight formats.
 
+**⚠️ Hard Engineering Rules (NEVER violate these):**
+
+**R1 — CPT Capability Registration (CRITICAL — admin-breaking if wrong)**
+Every Custom Post Type that has `show_ui => true` **MUST** use the explicit capabilities-mapped-to-manage_options pattern. **NEVER** use `capability_type` with any value (including `'post'`). WordPress generates unassigned capability names (e.g. `edit_restoration_pros`) from `capability_type`, and any attempt to render those caps fires PHP notices that print before HTTP headers, corrupting the WP admin layout for ALL users.
+
+The required pattern (already used by `frp_lead` and `restoration_pro` and `frp_claim_review`):
+```php
+'capabilities'  => [
+    'edit_post'          => 'manage_options',
+    'edit_posts'         => 'manage_options',
+    'edit_others_posts'  => 'manage_options',
+    'publish_posts'      => 'manage_options',
+    'read_post'          => 'manage_options',
+    'read_private_posts' => 'manage_options',
+    'delete_post'        => 'manage_options',
+],
+'map_meta_cap'  => true,
+```
+Rationale: mapping every cap to `manage_options` means admins always pass, no custom caps are ever registered, and `map_meta_cap => true` lets WordPress resolve individual post-level checks correctly without generating novel capability names.
+
+**R2 — Admin permission checks use `frp_is_administrator()`**
+Never use `current_user_can('manage_options')` in FRP code. SiteGround and Elementor inject capability filters that break `current_user_can` for App Password REST requests. Use `frp_is_administrator()` (which does a role-array check) in all `permission_callback` functions.
+
+**R3 — SiteGround WAF blocks Authorization on HTTP DELETE**
+Never use HTTP DELETE for WP REST endpoints that need admin auth on staging/production (SiteGround strips the Authorization header from DELETE requests, returning 401). Use POST-based admin endpoints instead (e.g. `/frp/v1/admin/delete-post`).
+
 ---
 
 ## Chunk 0: Decommission iRestorationPros (scope reduction)
