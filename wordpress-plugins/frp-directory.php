@@ -65,7 +65,21 @@ function frp_register_cpt() {
         'supports'      => [ 'title', 'editor', 'thumbnail', 'custom-fields' ],
         'menu_icon'     => 'dashicons-businessman',
         'show_in_menu'  => true,
-        'map_meta_cap'  => true,  // prevents map_meta_cap notice in WP 6.1+
+        // All caps mapped to manage_options; NO map_meta_cap so WP never tries to
+        // resolve singular (edit_post/read_post/delete_post) without a post ID —
+        // that combination is what triggers "map_meta_cap called incorrectly" in WP 6.1+.
+        'capabilities'  => [
+            'edit_post'          => 'manage_options',
+            'read_post'          => 'manage_options',
+            'delete_post'        => 'manage_options',
+            'edit_posts'         => 'manage_options',
+            'edit_others_posts'  => 'manage_options',
+            'publish_posts'      => 'manage_options',
+            'read_private_posts' => 'manage_options',
+            'delete_posts'       => 'manage_options',
+            'delete_others_posts'=> 'manage_options',
+            'create_posts'       => 'manage_options',
+        ],
     ] );
 }
 add_action( 'init', 'frp_register_cpt' );
@@ -90,16 +104,20 @@ function frp_register_lead_cpt() {
         'show_in_rest'  => false,
         'supports'      => [ 'title', 'custom-fields' ],
         'menu_icon'     => 'dashicons-email-alt',
+        // All caps mapped to manage_options; NO map_meta_cap — combining explicit
+        // singular caps with map_meta_cap=true causes "called incorrectly" notices.
         'capabilities'  => [
             'edit_post'          => 'manage_options',
+            'read_post'          => 'manage_options',
+            'delete_post'        => 'manage_options',
             'edit_posts'         => 'manage_options',
             'edit_others_posts'  => 'manage_options',
             'publish_posts'      => 'manage_options',
-            'read_post'          => 'manage_options',
             'read_private_posts' => 'manage_options',
-            'delete_post'        => 'manage_options',
+            'delete_posts'       => 'manage_options',
+            'delete_others_posts'=> 'manage_options',
+            'create_posts'       => 'manage_options',
         ],
-        'map_meta_cap'  => true,
     ] );
 }
 add_action( 'init', 'frp_register_lead_cpt' );
