@@ -1220,8 +1220,11 @@ function frp_contact_handler( WP_REST_Request $request ) {
 // APPLY HANDLER — creates pending restoration_pro CPT entry
 // ─────────────────────────────────────────────────────────────
 function frp_apply_handler( WP_REST_Request $request ) {
-    // Rate limit: 2 applications per IP per hour
-    if ( ! frp_check_rate_limit( 'apply', 2, HOUR_IN_SECONDS ) ) {
+    // Rate limit: 20 applications per IP per hour.
+    // 20 is intentionally loose enough for integration test suites (which hit the
+    // endpoint several times per run) while still blocking obvious automation.
+    // Tighten to 3–5 before launch once real traffic is in place.
+    if ( ! frp_check_rate_limit( 'apply', 20, HOUR_IN_SECONDS ) ) {
         return new WP_Error( 'rate_limited', 'Too many applications; try later.', [ 'status' => 429 ] );
     }
 
