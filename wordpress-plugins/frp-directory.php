@@ -53,6 +53,7 @@ function frp_register_cpt() {
         'supports'      => [ 'title', 'editor', 'thumbnail', 'custom-fields' ],
         'menu_icon'     => 'dashicons-businessman',
         'show_in_menu'  => true,
+        'map_meta_cap'  => true,  // prevents map_meta_cap notice in WP 6.1+
     ] );
 }
 add_action( 'init', 'frp_register_cpt' );
