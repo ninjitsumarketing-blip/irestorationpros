@@ -15,10 +15,12 @@ export async function createTestPro(opts = {}) {
 }
 
 // Delete a restoration_pro post by ID (force-delete, bypasses trash).
+// Uses /frp/v1/admin/delete-post (POST) instead of HTTP DELETE because
+// SiteGround WAF strips Authorization headers from DELETE requests (returns 401).
 export async function deleteTestPro(id) {
-  const { status } = await frpDelete(`/wp-json/wp/v2/restoration_pro/${id}?force=true`, { auth: true });
-  // 200 = deleted, 404 = already gone — both acceptable
-  if (status !== 200 && status !== 404) {
+  const { status } = await frpPost('/wp-json/frp/v1/admin/delete-post', { post_id: id }, { auth: true });
+  // 200 = deleted or already gone — handler is idempotent
+  if (status !== 200) {
     throw new Error(`deleteTestPro(${id}) failed: ${status}`);
   }
 }

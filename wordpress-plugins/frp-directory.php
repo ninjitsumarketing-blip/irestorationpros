@@ -743,6 +743,15 @@ function frp_register_rest_routes() {
         'callback'            => 'frp_admin_get_post_meta_handler',
         'permission_callback' => 'frp_is_administrator',
     ] );
+
+    // SiteGround WAF strips Authorization header from HTTP DELETE requests,
+    // returning 401 before WordPress processes auth. Use this POST endpoint
+    // instead of HTTP DELETE for test-fixture teardown.
+    register_rest_route( 'frp/v1', '/admin/delete-post', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_delete_post_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
 
@@ -816,6 +825,19 @@ function frp_admin_get_post_meta_handler( WP_REST_Request $r ) {
     }
     $raw = get_post_meta( $post_id, $key, true );
     return rest_ensure_response( [ 'value' => $raw === false ? '' : (string) $raw ] );
+}
+
+function frp_admin_delete_post_handler( WP_REST_Request $r ) {
+    $post_id = (int) $r->get_param( 'post_id' );
+    if ( ! $post_id ) {
+        return new WP_Error( 'bad_request', 'post_id required', [ 'status' => 400 ] );
+    }
+    $result = wp_delete_post( $post_id, true ); // force-delete, skip trash
+    if ( ! $result ) {
+        // Post didn't exist or already deleted — treat as success for idempotency
+        return rest_ensure_response( [ 'deleted' => true, 'id' => $post_id ] );
+    }
+    return rest_ensure_response( [ 'deleted' => true, 'id' => $post_id ] );
 }
 
 // ─────────────────────────────────────────────────────────────
