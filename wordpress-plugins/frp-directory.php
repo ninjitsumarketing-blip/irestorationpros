@@ -7,6 +7,8 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+require_once plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
+
 // ─────────────────────────────────────────────────────────────
 // INJECT FRP_LEAD_TOKEN — outputs window.FRP_LEAD_TOKEN on every
 // page so the frontend JS can authenticate against /frp/v1/leads
@@ -718,6 +720,29 @@ function frp_register_rest_routes() {
         // out by SiteGround/Elementor security for App Password REST requests.
         'permission_callback' => 'frp_is_administrator',
     ] );
+
+    // ── Admin diagnostic: test the matcher (test-suite only) ─────────
+    register_rest_route( 'frp/v1', '/admin/match-test', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_match_test_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
+    // ── Admin test helpers: read/write arbitrary post meta ────────────
+    // These routes exist to support integration tests that need to seed
+    // private meta fields (e.g. license_number, phone) that are not
+    // exposed via the standard WP REST API.
+    register_rest_route( 'frp/v1', '/admin/set-post-meta', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_set_post_meta_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
+    register_rest_route( 'frp/v1', '/admin/get-post-meta', [
+        'methods'             => 'GET',
+        'callback'            => 'frp_admin_get_post_meta_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
 
@@ -762,6 +787,33 @@ function frp_admin_bind_handler( WP_REST_Request $r ) {
 
     update_user_meta( $user_id, 'frp_pro_id', $pro_id );
     return rest_ensure_response( [ 'user_id' => $user_id, 'pro_id' => $pro_id ] );
+}
+
+function frp_admin_match_test_handler( WP_REST_Request $r ) {
+    $applicant = (array) $r->get_param( 'applicant' );
+    return rest_ensure_response( frp_match_applicant( $applicant ) );
+}
+
+function frp_admin_set_post_meta_handler( WP_REST_Request $r ) {
+    $post_id = (int) $r->get_param( 'post_id' );
+    $meta    = (array) $r->get_param( 'meta' );
+    if ( ! $post_id || empty( $meta ) ) {
+        return new WP_Error( 'bad_request', 'post_id and meta required', [ 'status' => 400 ] );
+    }
+    foreach ( $meta as $key => $value ) {
+        update_post_meta( $post_id, sanitize_key( (string) $key ), $value );
+    }
+    return rest_ensure_response( [ 'updated' => true ] );
+}
+
+function frp_admin_get_post_meta_handler( WP_REST_Request $r ) {
+    $post_id = (int) $r->get_param( 'post_id' );
+    $key     = sanitize_key( (string) $r->get_param( 'key' ) );
+    if ( ! $post_id || ! $key ) {
+        return new WP_Error( 'bad_request', 'post_id and key required', [ 'status' => 400 ] );
+    }
+    $raw = get_post_meta( $post_id, $key, true );
+    return rest_ensure_response( [ 'value' => $raw === false ? '' : (string) $raw ] );
 }
 
 // ─────────────────────────────────────────────────────────────
