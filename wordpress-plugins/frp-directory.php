@@ -712,10 +712,20 @@ function frp_register_rest_routes() {
     register_rest_route( 'frp/v1', '/admin/bind-pro-user', [
         'methods'             => 'POST',
         'callback'            => 'frp_admin_bind_handler',
-        'permission_callback' => function() { return current_user_can( 'manage_options' ); },
+        // Use role check directly — current_user_can('manage_options') is filtered
+        // out by SiteGround/Elementor security for App Password REST requests.
+        'permission_callback' => 'frp_is_administrator',
     ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
+
+// Returns true when the current user has the administrator role.
+// Checks roles array directly instead of current_user_can() which can be
+// filtered by security plugins to strip manage_options for App Password auth.
+function frp_is_administrator() {
+    $user = wp_get_current_user();
+    return $user instanceof WP_User && in_array( 'administrator', (array) $user->roles, true );
+}
 
 function frp_admin_bind_handler( WP_REST_Request $r ) {
     $login  = sanitize_user( (string) $r->get_param( 'user_login' ) );
