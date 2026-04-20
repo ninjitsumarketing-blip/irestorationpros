@@ -148,6 +148,8 @@ function frp_register_meta_fields() {
         'contact_name', 'contact_email',
         // Dispatch contact (used in contractor notifications — never public)
         'dispatch_phone', 'dispatch_email', 'dispatch_contact_name',
+        // License — private credential, not surfaced via public API
+        'license_number',
         // Billing contact (internal only — no card data stored)
         'billing_contact_name', 'billing_contact_email',
         'billing_address', 'billing_city', 'billing_state', 'billing_zip',
@@ -1215,72 +1217,78 @@ function frp_contact_handler( WP_REST_Request $request ) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// JOIN FORM HANDLER — creates pending restoration_pro CPT entry
+// APPLY HANDLER — creates pending restoration_pro CPT entry
 // ─────────────────────────────────────────────────────────────
 function frp_apply_handler( WP_REST_Request $request ) {
-    if ( ! frp_check_rate_limit( 'apply', 5, 300 ) ) {
-        return new WP_Error( 'rate_limited', 'Too many requests', [ 'status' => 429 ] );
+    // Rate limit: 2 applications per IP per hour
+    if ( ! frp_check_rate_limit( 'apply', 2, HOUR_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many applications; try later.', [ 'status' => 429 ] );
     }
 
-    $body = $request->get_json_params();
-    if ( ! $body ) {
-        return new WP_Error( 'bad_request', 'Invalid JSON body', [ 'status' => 400 ] );
+    $valid_services = [
+        'water-damage', 'mold-remediation', 'fire-damage',
+        'storm-damage', 'sewage-cleanup', 'structural', 'biohazard-cleanup',
+    ];
+
+    $business = sanitize_text_field( (string) ( $request->get_param( 'business_name' ) ?? '' ) );
+    $contact  = sanitize_text_field( (string) ( $request->get_param( 'contact_name' )  ?? '' ) );
+    $email    = sanitize_email(      (string) ( $request->get_param( 'contact_email' )  ?? '' ) );
+    $phone    = sanitize_text_field( (string) ( $request->get_param( 'dispatch_phone' ) ?? '' ) );
+    $license  = sanitize_text_field( (string) ( $request->get_param( 'license_number' ) ?? '' ) );
+    $years    = absint( $request->get_param( 'years_in_business' ) ?? 0 );
+    $zips     = sanitize_text_field( (string) ( $request->get_param( 'service_area_zips' ) ?? '' ) );
+    $city     = sanitize_text_field( (string) ( $request->get_param( 'service_area_city' ) ?? '' ) );
+    $state    = strtoupper( sanitize_text_field( (string) ( $request->get_param( 'state' ) ?? '' ) ) );
+    $services_raw = (array) ( $request->get_param( 'services' ) ?? [] );
+
+    // Required field validation
+    if ( ! $business || ! $email || ! $phone || ! $state ) {
+        return new WP_Error( 'bad_request', 'business_name, contact_email, dispatch_phone, state are required.', [ 'status' => 400 ] );
+    }
+    if ( ! is_email( $email ) ) {
+        return new WP_Error( 'bad_request', 'Invalid contact_email.', [ 'status' => 400 ] );
+    }
+    if ( ! preg_match( '/^\+?[\d\s\-().]{7,20}$/', $phone ) ) {
+        return new WP_Error( 'bad_request', 'Invalid dispatch_phone.', [ 'status' => 400 ] );
     }
 
-    $s = 'sanitize_text_field';
-
-    $company_name = $s( $body['company_name'] ?? '' );
-    if ( ! $company_name ) {
-        return new WP_Error( 'missing_field', 'company_name is required', [ 'status' => 422 ] );
+    // Services whitelist — reject any unknown service slug
+    $services = array_values( array_intersect( $services_raw, $valid_services ) );
+    if ( ! empty( $services_raw ) && count( $services ) !== count( $services_raw ) ) {
+        return new WP_Error( 'bad_request', 'One or more services are invalid.', [ 'status' => 400 ] );
     }
 
-    // Create the post as draft (pending review before going active)
-    $post_id = wp_insert_post( [
+    // Create the draft pro CPT entry
+    $pro_id = wp_insert_post( [
         'post_type'   => 'restoration_pro',
-        'post_title'  => $company_name,
         'post_status' => 'draft',
-        'meta_input'  => [
-            'contact_name'     => $s( $body['contact_name']    ?? '' ),
-            'contact_email'    => sanitize_email( $body['email'] ?? '' ),
-            'phone'            => $s( $body['phone']           ?? '' ),
-            'website'          => esc_url_raw( $body['website'] ?? '' ),
-            'address'          => $s( $body['address']         ?? '' ),
-            'city'             => $s( $body['city']            ?? '' ),
-            'state'            => $s( $body['state']           ?? '' ),
-            'zip_codes'        => $s( $body['zip_codes_served'] ?? $body['zip_code'] ?? '' ),
-            'services'         => $s( $body['services']        ?? '' ),
-            'certifications'   => $s( $body['certifications']  ?? '' ),
-            'description'      => sanitize_textarea_field( $body['description'] ?? '' ),
-            'years_in_business'=> absint( $body['years_in_business'] ?? 0 ),
-            'listing_status'   => 'pending',
-            'listing_tier'     => 'free',
-            'joined_source'    => 'join-form',
-            'date_applied'     => gmdate( 'Y-m-d' ),
-        ],
-    ] );
+        'post_title'  => $business,
+    ], true );
 
-    if ( is_wp_error( $post_id ) ) {
-        return new WP_Error( 'insert_failed', $post_id->get_error_message(), [ 'status' => 500 ] );
+    if ( is_wp_error( $pro_id ) ) {
+        return new WP_Error( 'insert_failed', $pro_id->get_error_message(), [ 'status' => 500 ] );
     }
 
-    // Notify admin
-    wp_mail(
-        get_option( 'admin_email' ),
-        'New Pro Application: ' . $company_name,
-        "A new restoration pro has applied to be listed.\n\n" .
-        "Company: {$company_name}\n" .
-        "Contact: " . ( $body['contact_name'] ?? '' ) . "\n" .
-        "Email: " . ( $body['email'] ?? '' ) . "\n" .
-        "Phone: " . ( $body['phone'] ?? '' ) . "\n" .
-        "City: " . ( $body['city'] ?? '' ) . "\n\n" .
-        "Review at: " . admin_url( 'post.php?post=' . $post_id . '&action=edit' )
-    );
+    update_post_meta( $pro_id, 'contact_name',      $contact );
+    update_post_meta( $pro_id, 'contact_email',      $email );
+    update_post_meta( $pro_id, 'dispatch_phone',     $phone );
+    update_post_meta( $pro_id, 'dispatch_email',     $email );
+    update_post_meta( $pro_id, 'license_number',     $license );
+    update_post_meta( $pro_id, 'years_in_business',  $years );
+    update_post_meta( $pro_id, 'zip_codes',          $zips );
+    update_post_meta( $pro_id, 'city',               $city );
+    update_post_meta( $pro_id, 'state',              $state );
+    update_post_meta( $pro_id, 'services',           implode( ',', $services ) );
+    update_post_meta( $pro_id, 'listing_status',     'pending_review' );
+    update_post_meta( $pro_id, 'listing_tier',       'free' );
+    update_post_meta( $pro_id, 'is_paid_listing',    0 );
+    update_post_meta( $pro_id, 'joined_source',      'apply_form' );
+    update_post_meta( $pro_id, 'date_seeded',        gmdate( 'c' ) );
 
-    return rest_ensure_response( [
-        'success' => true,
-        'post_id' => $post_id,
-        'message' => 'Application received. We will review and activate your listing within 24 hours.',
-    ] );
+    // Fire notification (Task 1.9 will hook into this action for emails)
+    do_action( 'frp_application_submitted', $pro_id );
+
+    return rest_ensure_response( [ 'application_id' => $pro_id, 'status' => 'pending_review' ] );
 }
 
 function frp_search_handler( WP_REST_Request $request ) {
