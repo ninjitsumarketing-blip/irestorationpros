@@ -7,8 +7,19 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-require_once plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
-require_once plugin_dir_path( __FILE__ ) . 'frp-emails.php';
+$frp_match_path  = plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
+$frp_emails_path = plugin_dir_path( __FILE__ ) . 'frp-emails.php';
+if ( file_exists( $frp_match_path ) ) {
+    require_once $frp_match_path;
+} else {
+    error_log( 'FRP: missing includes/frp-match.php at ' . $frp_match_path );
+}
+if ( file_exists( $frp_emails_path ) ) {
+    require_once $frp_emails_path;
+} else {
+    error_log( 'FRP: missing frp-emails.php at ' . $frp_emails_path );
+}
+unset( $frp_match_path, $frp_emails_path );
 
 // ─────────────────────────────────────────────────────────────
 // INJECT FRP_LEAD_TOKEN — outputs window.FRP_LEAD_TOKEN on every
@@ -54,16 +65,7 @@ function frp_register_cpt() {
         'supports'      => [ 'title', 'editor', 'thumbnail', 'custom-fields' ],
         'menu_icon'     => 'dashicons-businessman',
         'show_in_menu'  => true,
-        'capabilities'  => [
-            'edit_post'          => 'manage_options',
-            'edit_posts'         => 'manage_options',
-            'edit_others_posts'  => 'manage_options',
-            'publish_posts'      => 'manage_options',
-            'read_post'          => 'manage_options',
-            'read_private_posts' => 'manage_options',
-            'delete_post'        => 'manage_options',
-        ],
-        'map_meta_cap'  => true,
+        'map_meta_cap'  => true,  // prevents map_meta_cap notice in WP 6.1+
     ] );
 }
 add_action( 'init', 'frp_register_cpt' );
@@ -116,17 +118,22 @@ function frp_register_claim_review_cpt() {
         'show_ui'         => true,
         'show_in_menu'    => true,
         'show_in_rest'    => true,  // needed so REST API can return ticket objects
-        'map_meta_cap'    => true,
         'supports'        => [ 'title', 'custom-fields' ],
-        'menu_icon'     => 'dashicons-clipboard',
-        'capabilities'  => [
+        'menu_icon'       => 'dashicons-clipboard',
+        // All caps → manage_options; no map_meta_cap so no per-post resolution notices.
+        // Singular meta caps (edit_post, read_post, delete_post) included so direct
+        // capability checks without a post ID also resolve to manage_options.
+        'capabilities'    => [
             'edit_post'          => 'manage_options',
+            'read_post'          => 'manage_options',
+            'delete_post'        => 'manage_options',
             'edit_posts'         => 'manage_options',
             'edit_others_posts'  => 'manage_options',
             'publish_posts'      => 'manage_options',
-            'read_post'          => 'manage_options',
             'read_private_posts' => 'manage_options',
-            'delete_post'        => 'manage_options',
+            'delete_posts'       => 'manage_options',
+            'delete_others_posts'=> 'manage_options',
+            'create_posts'       => 'manage_options',
         ],
     ] );
 }
