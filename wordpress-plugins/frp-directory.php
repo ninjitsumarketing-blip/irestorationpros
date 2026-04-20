@@ -842,6 +842,13 @@ function frp_register_rest_routes() {
         'callback'            => 'frp_admin_delete_post_handler',
         'permission_callback' => 'frp_is_administrator',
     ] );
+
+    // ── Claim verification: contractor clicks email link to claim listing ──────
+    register_rest_route( 'frp/v1', '/claim/(?P<id>\d+)', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_claim_verify_handler',
+        'permission_callback' => '__return_true',
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
 
@@ -1563,6 +1570,89 @@ function frp_apply_open_review_ticket( array $applicant, array $match ) : int {
     update_post_meta( $ticket_id, 'review_status',    'open' );
     do_action( 'frp_claim_review_opened', $ticket_id );
     return $ticket_id;
+}
+
+/**
+ * POST /frp/v1/claim/{id}
+ *
+ * Verify a claim token and, when confirm=true, bind a WP user to the listing.
+ * Token check is performed BEFORE surfacing claim_status to prevent enumeration:
+ * an attacker cannot distinguish "wrong token" from "already claimed" without
+ * first presenting a valid token for that pro_id.
+ *
+ * @param WP_REST_Request $r
+ * @return WP_REST_Response|WP_Error
+ */
+function frp_claim_verify_handler( WP_REST_Request $r ) {
+    $pro_id = (int) $r['id'];
+    if ( get_post_type( $pro_id ) !== 'restoration_pro' ) {
+        // Return 403, not 404 — do not leak whether the pro_id exists.
+        return new WP_Error( 'forbidden', 'Invalid token', [ 'status' => 403 ] );
+    }
+    if ( ! frp_check_rate_limit( 'claim_verify_' . $pro_id, 5, HOUR_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many attempts', [ 'status' => 429 ] );
+    }
+
+    // Token check FIRST — checking claim_status before token would let an attacker
+    // enumerate which pro_ids are claimed by watching for 409 vs 403 responses
+    // without ever needing a valid token.
+    $token  = (string) ( $r->get_param( 'token' ) ?? '' );
+    $stored = (string) get_post_meta( $pro_id, 'claim_token', true );
+    $expiry = (string) get_post_meta( $pro_id, 'claim_token_expiry', true );
+    if ( ! $token || ! $stored || ! hash_equals( $stored, $token ) ) {
+        return new WP_Error( 'forbidden', 'Invalid token', [ 'status' => 403 ] );
+    }
+    if ( ! $expiry || strtotime( $expiry ) < time() ) {
+        return new WP_Error( 'forbidden', 'Token expired', [ 'status' => 403 ] );
+    }
+
+    // Token is valid — now safe to surface claim_status.
+    $claim_status = (string) get_post_meta( $pro_id, 'claim_status', true );
+    if ( $claim_status === 'claimed' ) {
+        return new WP_Error( 'conflict', 'Listing is already claimed.', [ 'status' => 409 ] );
+    }
+
+    $confirm = (bool) $r->get_param( 'confirm' );
+    if ( ! $confirm ) {
+        return rest_ensure_response( [ 'preview' => true, 'business' => get_the_title( $pro_id ) ] );
+    }
+
+    // Bind: reuse existing WP user if logged in, otherwise create/upgrade from on-file email.
+    $uid = get_current_user_id();
+    if ( ! $uid ) {
+        $email = (string) get_post_meta( $pro_id, 'contact_email', true );
+        $user  = get_user_by( 'email', $email );
+        if ( ! $user ) {
+            $pass = wp_generate_password( 24 );
+            $uid  = wp_insert_user( [
+                'user_login' => sanitize_user( substr( explode( '@', $email )[0], 0, 60 ) . '-' . wp_rand( 100, 999 ) ),
+                'user_pass'  => $pass,
+                'user_email' => $email,
+                'role'       => 'restoration_pro',
+            ] );
+            if ( is_wp_error( $uid ) ) return $uid;
+            wp_new_user_notification( $uid, null, 'both' );
+        } else {
+            $uid = $user->ID;
+            $user->set_role( 'restoration_pro' );
+        }
+    }
+
+    update_user_meta( $uid, 'frp_pro_id', $pro_id );
+    update_post_meta( $pro_id, 'claim_status',    'claimed' );
+    update_post_meta( $pro_id, 'claimed_by_user', $uid );
+    update_post_meta( $pro_id, 'date_claimed',    gmdate( 'c' ) );
+    update_post_meta( $pro_id, 'joined_source',   'apply_claim' );
+
+    // Wipe transient claim-flow meta so admin lists don't show stale applicant data.
+    delete_post_meta( $pro_id, 'claim_token' );
+    delete_post_meta( $pro_id, 'claim_token_expiry' );
+    delete_post_meta( $pro_id, 'claim_applicant_email' );
+    delete_post_meta( $pro_id, 'claim_applicant_phone' );
+
+    do_action( 'frp_pro_claimed', $pro_id, $uid );
+
+    return rest_ensure_response( [ 'claimed' => true, 'pro_id' => $pro_id, 'user_id' => $uid ] );
 }
 
 function frp_search_handler( WP_REST_Request $request ) {
