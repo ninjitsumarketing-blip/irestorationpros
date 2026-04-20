@@ -8,6 +8,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
+require_once plugin_dir_path( __FILE__ ) . 'frp-emails.php';
 
 // ─────────────────────────────────────────────────────────────
 // INJECT FRP_LEAD_TOKEN — outputs window.FRP_LEAD_TOKEN on every
@@ -91,6 +92,28 @@ function frp_register_lead_cpt() {
     ] );
 }
 add_action( 'init', 'frp_register_lead_cpt' );
+
+// ─────────────────────────────────────────────────────────────
+// 1b-ii. REGISTER CLAIM REVIEW CPT — admin-only queue for ambiguous matches
+// ─────────────────────────────────────────────────────────────
+function frp_register_claim_review_cpt() {
+    register_post_type( 'frp_claim_review', [
+        'labels'          => [
+            'name'          => 'Claim Reviews',
+            'singular_name' => 'Claim Review',
+            'all_items'     => 'All Claim Reviews',
+        ],
+        'public'          => false,
+        'show_ui'         => true,
+        'show_in_menu'    => true,
+        'show_in_rest'    => true,  // needed so REST API can return ticket objects
+        'map_meta_cap'    => true,
+        'supports'        => [ 'title', 'custom-fields' ],
+        'menu_icon'       => 'dashicons-clipboard',
+        'capability_type' => 'post',
+    ] );
+}
+add_action( 'init', 'frp_register_claim_review_cpt' );
 
 // ─────────────────────────────────────────────────────────────
 // 1c. REGISTER frp_lead META FIELDS — all private (show_in_rest=false)
@@ -219,6 +242,30 @@ function frp_register_meta_fields() {
             'auth_callback' => '__return_true',
         ] );
     }
+
+    // Claim-flow meta — all private (never surfaced via public REST)
+    $claim_fields = [
+        'claim_status',          // unclaimed|claim_pending|claimed|disputed
+        'claim_token',           // hex32
+        'claim_token_expiry',    // ISO timestamp
+        'claim_applicant_email', // transient — cleared after successful claim
+        'claim_applicant_phone', // transient — cleared after successful claim
+        'date_claimed',          // ISO timestamp
+    ];
+    foreach ( $claim_fields as $key ) {
+        register_post_meta( 'restoration_pro', $key, [
+            'show_in_rest'  => false,
+            'single'        => true,
+            'type'          => 'string',
+            'auth_callback' => function() { return current_user_can( 'edit_posts' ); },
+        ] );
+    }
+    register_post_meta( 'restoration_pro', 'claimed_by_user', [
+        'show_in_rest'  => false,
+        'single'        => true,
+        'type'          => 'integer',
+        'auth_callback' => function() { return current_user_can( 'edit_posts' ); },
+    ] );
 
     // Test-harness fixture flag — allows smoke tests to tag and clean up seeded posts.
     register_post_meta( 'restoration_pro', 'test_fixture', [
@@ -1384,7 +1431,96 @@ function frp_apply_handler( WP_REST_Request $request ) {
     }
     $applicant = frp_apply_validate( $request );
     if ( is_wp_error( $applicant ) ) return $applicant;
+
+    // Route through the matcher before inserting a new record.
+    $match = frp_match_applicant( $applicant );
+
+    if ( $match['tier'] === 'strong' ) {
+        return rest_ensure_response( frp_apply_initiate_claim( $applicant, $match, false ) );
+    }
+    if ( $match['tier'] === 'medium' ) {
+        return rest_ensure_response( frp_apply_initiate_claim( $applicant, $match, true ) );
+    }
+    if ( $match['tier'] === 'weak' ) {
+        $ticket = frp_apply_open_review_ticket( $applicant, $match );
+        return rest_ensure_response( [
+            'status'    => 'pending_manual_review',
+            'ticket_id' => $ticket,
+            'reason'    => $match['reason'],
+        ] );
+    }
+    // 'none' — fall through to original insert path
     return rest_ensure_response( frp_apply_insert_new( $applicant ) );
+}
+
+/**
+ * Initiate the claim flow for a strong or medium match.
+ * Sends a verification email to the on-file address.
+ * If no on-file email, opens an admin review ticket instead.
+ *
+ * @param array $applicant Result of frp_apply_validate().
+ * @param array $match     Result of frp_match_applicant().
+ * @param bool  $need_admin_ticket True for medium matches (safety-net ticket).
+ */
+function frp_apply_initiate_claim( array $applicant, array $match, bool $need_admin_ticket ) : array|WP_Error {
+    $pro_id       = $match['pro_id'];
+    $onfile_email = (string) get_post_meta( $pro_id, 'contact_email', true );
+
+    if ( ! $onfile_email || ! is_email( $onfile_email ) ) {
+        // No on-file email → can't send verification; route to admin.
+        $ticket = frp_apply_open_review_ticket( $applicant, array_merge( $match, [ 'fallback_reason' => 'no on-file email' ] ) );
+        return [
+            'status'    => 'pending_manual_review',
+            'ticket_id' => $ticket,
+            'reason'    => 'no on-file email; admin will reach out',
+        ];
+    }
+
+    // frp_generate_lead_token() is a pure helper that returns a token array
+    // without persisting anything. Override the default 1-hr expiry to 72 hrs.
+    $tok          = frp_generate_lead_token();
+    $claim_expiry = gmdate( 'c', time() + 72 * HOUR_IN_SECONDS );
+
+    update_post_meta( $pro_id, 'claim_status',          'claim_pending' );
+    update_post_meta( $pro_id, 'claim_token',           $tok['token'] );
+    update_post_meta( $pro_id, 'claim_token_expiry',    $claim_expiry );
+    update_post_meta( $pro_id, 'claim_applicant_email', $applicant['email'] );
+    update_post_meta( $pro_id, 'claim_applicant_phone', $applicant['phone'] );
+
+    if ( $need_admin_ticket ) {
+        frp_apply_open_review_ticket( $applicant, array_merge( $match, [ 'safety_net' => true ] ) );
+    }
+
+    do_action( 'frp_claim_requested', $pro_id, $applicant );
+
+    return [
+        'status'     => 'claim_sent',
+        'pro_id'     => $pro_id,
+        'match_tier' => $match['tier'],
+        'message'    => 'We already list this business. A verification email was sent to the address we have on file.',
+    ];
+}
+
+/**
+ * Open an admin review ticket (frp_claim_review CPT) for weak/medium matches
+ * and strong matches with no on-file email.
+ *
+ * @return int Ticket post ID (0 on failure).
+ */
+function frp_apply_open_review_ticket( array $applicant, array $match ) : int {
+    $ticket_id = wp_insert_post( [
+        'post_type'   => 'frp_claim_review',
+        'post_status' => 'publish',
+        'post_title'  => 'Review: ' . $applicant['business'],
+    ] );
+    if ( is_wp_error( $ticket_id ) ) return 0;
+    update_post_meta( $ticket_id, 'match_tier',       $match['tier'] );
+    update_post_meta( $ticket_id, 'candidate_pro_id', $match['pro_id'] );
+    update_post_meta( $ticket_id, 'reason',           $match['reason'] );
+    update_post_meta( $ticket_id, 'applicant_json',   wp_json_encode( $applicant ) );
+    update_post_meta( $ticket_id, 'review_status',    'open' );
+    do_action( 'frp_claim_review_opened', $ticket_id );
+    return $ticket_id;
 }
 
 function frp_search_handler( WP_REST_Request $request ) {
