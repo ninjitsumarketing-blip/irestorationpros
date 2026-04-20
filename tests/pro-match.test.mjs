@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { frpPost } from './helpers/wp-client.mjs';
 import { seedPro, resetTestPros } from './helpers/staging.mjs';
 
-// Clean up all test fixtures after all tests in this file
+// Wipe any fixtures left by a prior crashed run before starting, then clean up after.
+test.before(async () => {
+  await resetTestPros();
+});
+
 test.after(async () => {
   await resetTestPros();
 });

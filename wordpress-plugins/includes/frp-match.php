@@ -90,6 +90,7 @@ function frp_extract_domain( string $url ) : string {
 function frp_find_pro_by_meta( string $key, string $value ) : int {
     $q = new WP_Query( [
         'post_type'      => 'restoration_pro',
+        'post_status'    => [ 'publish', 'draft' ], // exclude trash — consistent with name-prefix query
         'posts_per_page' => 1,
         'fields'         => 'ids',
         'meta_query'     => [ [ 'key' => $key, 'value' => $value, 'compare' => '=' ] ],
@@ -129,6 +130,7 @@ function frp_find_pros_by_meta( string $key, string $value, string $variant = 'r
 
     $q = new WP_Query( [
         'post_type'      => 'restoration_pro',
+        'post_status'    => [ 'publish', 'draft' ], // exclude trash — consistent with name-prefix query
         'posts_per_page' => 20,
         'fields'         => 'ids',
         'meta_query'     => [ [ 'key' => $key, 'value' => $value ] ],

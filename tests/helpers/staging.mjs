@@ -72,6 +72,8 @@ export async function setPostMeta(postId, key, value) {
 
 // Count all restoration_pro posts accessible to admin (any status).
 // Used in apply-claim tests to assert delta (±N posts) from a baseline.
+// NOTE: returns at most 100 (WP REST max per_page). Suitable only for staging
+// environments with <100 pros. Do NOT use this for absolute counts in CI.
 export async function countPros() {
   const { status, body } = await frpGet('/wp-json/wp/v2/restoration_pro?per_page=100&status=any', { auth: true });
   return (status === 200 && Array.isArray(body)) ? body.length : 0;

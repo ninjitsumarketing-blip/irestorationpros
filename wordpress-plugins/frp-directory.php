@@ -801,14 +801,16 @@ function frp_admin_set_post_meta_handler( WP_REST_Request $r ) {
         return new WP_Error( 'bad_request', 'post_id and meta required', [ 'status' => 400 ] );
     }
     foreach ( $meta as $key => $value ) {
-        update_post_meta( $post_id, sanitize_key( (string) $key ), $value );
+        // sanitize_text_field preserves case + underscores; sanitize_key would
+        // lowercase everything and strip hyphens, silently corrupting keys.
+        update_post_meta( $post_id, sanitize_text_field( (string) $key ), $value );
     }
     return rest_ensure_response( [ 'updated' => true ] );
 }
 
 function frp_admin_get_post_meta_handler( WP_REST_Request $r ) {
     $post_id = (int) $r->get_param( 'post_id' );
-    $key     = sanitize_key( (string) $r->get_param( 'key' ) );
+    $key     = sanitize_text_field( (string) $r->get_param( 'key' ) );
     if ( ! $post_id || ! $key ) {
         return new WP_Error( 'bad_request', 'post_id and key required', [ 'status' => 400 ] );
     }
