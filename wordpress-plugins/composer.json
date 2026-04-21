@@ -1,0 +1,10 @@
+{
+  "name": "frp/billing",
+  "description": "Stripe PHP SDK for FRP billing plugin",
+  "require": {
+    "stripe/stripe-php": "^13.0"
+  },
+  "config": {
+    "vendor-dir": "vendor"
+  }
+}
