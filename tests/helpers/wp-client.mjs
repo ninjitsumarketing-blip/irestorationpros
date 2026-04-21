@@ -49,12 +49,19 @@ function timedFetch(url, init = {}) {
   return fetch(url, { ...init, signal: ac.signal }).finally(() => clearTimeout(timer));
 }
 
-// Important #4 — parse JSON safely, preserve raw body on failure
+// Important #4 — parse JSON safely, preserve raw body on failure.
+// SiteGround Security (sg-security) injects PHP warnings before the JSON body
+// (e.g. "Object of class WP_REST_Response could not be converted to int").
+// When the first parse fails, strip everything before the first { or [ and retry.
 async function safeJson(res) {
   const text = await res.text();
-  let body;
-  try { body = JSON.parse(text); } catch { body = text || null; }
-  return body;
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  // Strip leading PHP warning/notice HTML and retry from the first JSON delimiter.
+  const jsonStart = text.search(/[{[]/);
+  if (jsonStart !== -1) {
+    try { return JSON.parse(text.slice(jsonStart)); } catch { /* fall through */ }
+  }
+  return text || null;
 }
 
 export async function frpGet(path, { auth = false } = {}) {
@@ -99,6 +106,21 @@ export async function frpDelete(path, { auth = false } = {}) {
   } catch (err) {
     throw new Error(`DELETE ${BASE + path} — ${err.message}`, { cause: err });
   }
+}
+
+let _frpLeadToken = null;
+export async function getFrpLeadToken() {
+  if (_frpLeadToken !== null) return _frpLeadToken;
+  const res = await timedFetch(BASE + '/');
+  const html = await res.text();
+  const m = html.match(/window\.FRP_LEAD_TOKEN=("(?:[^"\\]|\\.)*")/);
+  _frpLeadToken = m ? JSON.parse(m[1]) : '';
+  return _frpLeadToken;
+}
+
+export async function frpPostLead(path, body) {
+  const token = await getFrpLeadToken();
+  return frpPost(path, body, { headers: { 'X-FRP-Lead-Token': token } });
 }
 
 export { BASE };

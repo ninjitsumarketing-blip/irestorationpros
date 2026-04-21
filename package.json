@@ -4,7 +4,7 @@
   "description": "Automated SEO lead gen system for restoration companies",
   "type": "module",
   "scripts": {
-    "test": "NODE_ENV=test node --test tests/*.mjs",
+    "test": "NODE_ENV=test node --test --test-concurrency=1 tests/*.mjs",
     "test-wp": "node scripts/wp-publisher.js",
     "test-image": "node scripts/image-generator.js"
   },

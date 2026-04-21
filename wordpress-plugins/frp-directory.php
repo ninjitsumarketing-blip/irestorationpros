@@ -882,6 +882,15 @@ function frp_register_rest_routes() {
         'permission_callback' => 'frp_is_administrator',
     ] );
 
+    // ── Admin: debug — raw lead meta (test-suite introspection) ────────
+    // Returns all post meta for an frp_lead post, with each value flattened
+    // from WP's array wrapper to a scalar so tests can do lead.key not lead.key[0].
+    register_rest_route( 'frp/v1', '/admin/debug/lead-raw/(?P<id>\d+)', [
+        'methods'             => 'GET',
+        'callback'            => 'frp_admin_debug_lead_raw_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
     // ── Admin: approve or reject a claim-review ticket ───────────
     register_rest_route( 'frp/v1', '/admin/claim-review/(?P<id>\d+)/approve', [
         'methods'             => 'POST',
@@ -1017,6 +1026,20 @@ function frp_admin_reset_rate_limits_handler( WP_REST_Request $r ) {
             OR option_name LIKE '_transient_timeout_frp_rl_%'"
     );
     return rest_ensure_response( [ 'deleted_rows' => (int) $deleted ] );
+}
+
+function frp_admin_debug_lead_raw_handler( WP_REST_Request $r ) {
+    $id = (int) $r->get_param( 'id' );
+    if ( get_post_type( $id ) !== 'frp_lead' ) {
+        return new WP_Error( 'not_found', 'Lead not found.', [ 'status' => 404 ] );
+    }
+    // WP returns each meta value as an array; flatten to first element for easy test assertions.
+    $raw = get_post_meta( $id );
+    $flat = [];
+    foreach ( $raw as $key => $values ) {
+        $flat[ $key ] = isset( $values[0] ) ? $values[0] : null;
+    }
+    return rest_ensure_response( $flat );
 }
 
 // ─────────────────────────────────────────────────────────────

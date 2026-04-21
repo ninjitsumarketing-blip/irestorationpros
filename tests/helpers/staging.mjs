@@ -1,4 +1,4 @@
-import { frpPost, frpGet, frpDelete } from './wp-client.mjs';
+import { frpPost, frpGet, frpDelete, frpPostLead } from './wp-client.mjs';
 
 // Create a minimal restoration_pro post for test fixture.
 // opts: { business_name?, meta: {...} }
@@ -98,6 +98,44 @@ export async function deleteMeta(postId, key) {
     key,
   }, { auth: true });
   if (status !== 200) throw new Error(`deleteMeta(${postId}, ${key}) failed: ${status} ${JSON.stringify(body)}`);
+}
+
+// Creates a test lead via the REST API. Tags it test_fixture=1 for cleanup.
+// opts.tokenExpired: true → backdates lead_update_token_expiry by 2 hours
+export async function createTestLead(opts = {}) {
+  const uid = Date.now();
+  const { status, body } = await frpPostLead('/wp-json/frp/v1/leads', {
+    phone: `555${uid.toString().slice(-7)}`,
+    service: 'water-damage',
+    urgency: 'now',
+    property_type: 'residential',
+    has_insurance: 'yes',
+    zip: '90210',
+    source: 'guided_flow',
+  });
+  if (status !== 200) throw new Error(`createTestLead failed: ${status} ${JSON.stringify(body)}`);
+  // Tag for cleanup
+  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
+    { post_id: body.lead_id, meta: { test_fixture: '1' } }, { auth: true });
+  if (opts.tokenExpired) {
+    const expired = new Date(Date.now() - 7_200_000).toISOString();
+    await frpPost('/wp-json/frp/v1/admin/set-post-meta',
+      { post_id: body.lead_id, meta: { lead_update_token_expiry: expired } }, { auth: true });
+  }
+  return { lead_id: body.lead_id, token: body.lead_update_token };
+}
+
+// Delete all frp_lead posts tagged test_fixture=1.
+export async function resetTestLeads() {
+  const { status, body } = await frpGet(
+    '/wp-json/wp/v2/frp_lead?meta_key=test_fixture&meta_value=1&per_page=100&status=any',
+    { auth: true }
+  );
+  if (status === 200 && Array.isArray(body)) {
+    await Promise.all(body.map(p =>
+      frpPost('/wp-json/frp/v1/admin/delete-post', { post_id: p.id }, { auth: true })
+    ));
+  }
 }
 
 /**
