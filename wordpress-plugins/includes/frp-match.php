@@ -5,14 +5,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Score applicant against existing restoration_pro posts.
  * Return highest-confidence hit.
  *
- * @param array $a Applicant data (keys: license_number, google_place_id, yelp_id,
- *                 dispatch_phone, business_name, website, state)
+ * @param array $a Applicant data. Canonical keys (used by match-test endpoint):
+ *                 license_number, google_place_id, yelp_id, dispatch_phone, business_name, website, state.
+ *                 Alias keys (used by frp_apply_validate return value):
+ *                 license → license_number, phone → dispatch_phone, business → business_name.
  * @return array { tier: 'strong'|'medium'|'weak'|'none', pro_id: int, reason: string, signals: array }
  */
 function frp_match_applicant( array $a ) : array {
     // ── Strong-tier lookups (unique identifiers) ──────────────────────
+    // Key aliases: frp_apply_validate() returns 'license' (not 'license_number').
+    // The canonical matcher keys are used by the match-test endpoint; both are accepted.
+    $key_aliases = [ 'license_number' => 'license' ];
     foreach ( [ 'license_number', 'google_place_id', 'yelp_id' ] as $key ) {
         $val = trim( (string) ( $a[ $key ] ?? '' ) );
+        if ( $val === '' && isset( $key_aliases[ $key ] ) ) {
+            $val = trim( (string) ( $a[ $key_aliases[ $key ] ] ?? '' ) );
+        }
         if ( $val === '' ) continue;
         $hit = frp_find_pro_by_meta( $key, $val );
         if ( $hit ) {
@@ -21,8 +29,9 @@ function frp_match_applicant( array $a ) : array {
     }
 
     // ── Medium-tier lookups ───────────────────────────────────────────
-    $phone_norm = frp_normalize_phone( $a['dispatch_phone'] ?? '' );
-    $name_norm  = frp_normalize_name( $a['business_name'] ?? '' );
+    // frp_apply_validate() returns 'phone' and 'business'; accept both forms.
+    $phone_norm = frp_normalize_phone( $a['dispatch_phone'] ?? $a['phone'] ?? '' );
+    $name_norm  = frp_normalize_name( $a['business_name'] ?? $a['business'] ?? '' );
     if ( $phone_norm ) {
         foreach ( frp_find_pros_by_meta( 'phone', $phone_norm, 'normalized' ) as $pid ) {
             $candidate_name = frp_normalize_name( get_the_title( $pid ) );
