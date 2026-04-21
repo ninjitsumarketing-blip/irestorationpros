@@ -2,12 +2,13 @@ import { frpPost, frpGet, frpDelete, frpPostLead } from './wp-client.mjs';
 
 // Authenticate as the pro user (restoration_pro role) for billing/contractor tests.
 // Returns { auth: 'pro', pro_id: number }.
+// `label` is informational only — authentication always uses FRP_STAGING_PRO_USERNAME/APP_PASSWORD.
 // pro_id will be 0 if the get-user-meta admin endpoint is not yet provisioned (acceptable for Task 1.6).
-export async function loginAsPro(username) {
+export async function loginAsPro(label = 'pro') {
   // Verify pro auth works — get user info
   const { status, body } = await frpGet('/wp-json/wp/v2/users/me', { auth: 'pro' });
   if (status !== 200) {
-    throw new Error(`loginAsPro: authentication failed for "${username}": ${status} ${JSON.stringify(body)}`);
+    throw new Error(`loginAsPro("${label}"): authentication failed: ${status} ${JSON.stringify(body)}`);
   }
   const userId = body.id;
   // Fetch bound frp_pro_id from user meta via admin endpoint (if available).

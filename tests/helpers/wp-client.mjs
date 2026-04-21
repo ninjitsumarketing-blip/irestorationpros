@@ -38,6 +38,10 @@ const PRO_AUTH = 'Basic ' + Buffer.from(
   `${process.env.FRP_STAGING_PRO_USERNAME}:${String(process.env.FRP_STAGING_PRO_APP_PASSWORD || '').replace(/\s+/g, '')}`
 ).toString('base64');
 
+if (!process.env.FRP_STAGING_PRO_USERNAME) {
+  process.emitWarning('[wp-client] FRP_STAGING_PRO_USERNAME not configured — pro auth tests will get 401');
+}
+
 // `auth`: false = no auth, true = admin, 'subscriber' = non-admin user, 'pro' = restoration_pro role.
 function resolveAuth(auth) {
   if (auth === true) return AUTH;

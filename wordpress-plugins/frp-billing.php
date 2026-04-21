@@ -101,36 +101,45 @@ function frp_billing_checkout( WP_REST_Request $r ) {
     if ( ! defined( 'FRP_STRIPE_SECRET_KEY' ) ) {
         return new WP_Error( 'not_configured', 'Stripe secret not configured.', [ 'status' => 500 ] );
     }
+    if ( ! class_exists( '\Stripe\Stripe' ) ) {
+        return new WP_Error( 'not_configured', 'Stripe SDK not loaded.', [ 'status' => 500 ] );
+    }
 
     $pro_id = frp_current_pro_id();
     if ( ! $pro_id ) {
         return new WP_Error( 'no_pro', 'User is not bound to a pro.', [ 'status' => 403 ] );
     }
 
-    \Stripe\Stripe::setApiKey( FRP_STRIPE_SECRET_KEY );
+    try {
+        \Stripe\Stripe::setApiKey( FRP_STRIPE_SECRET_KEY );
 
-    $customer_id = (string) get_user_meta( get_current_user_id(), 'frp_stripe_customer_id', true );
-    if ( ! $customer_id ) {
-        $customer = \Stripe\Customer::create( [
-            'email'    => wp_get_current_user()->user_email,
-            'metadata' => [ 'frp_pro_id' => (string) $pro_id, 'wp_user_id' => (string) get_current_user_id() ],
+        $customer_id = (string) get_user_meta( get_current_user_id(), 'frp_stripe_customer_id', true );
+        if ( ! $customer_id ) {
+            $customer = \Stripe\Customer::create( [
+                'email'    => wp_get_current_user()->user_email,
+                'metadata' => [ 'frp_pro_id' => (string) $pro_id, 'wp_user_id' => (string) get_current_user_id() ],
+            ] );
+            $customer_id = $customer->id;
+            update_user_meta( get_current_user_id(), 'frp_stripe_customer_id', $customer_id );
+        }
+
+        $base    = home_url();
+        $session = \Stripe\Checkout\Session::create( [
+            'mode'         => 'subscription',
+            'customer'     => $customer_id,
+            'line_items'   => [ [ 'price' => $price_id, 'quantity' => 1 ] ],
+            'success_url'  => $base . '/contractor/dashboard/?billing=success&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url'   => $base . '/contractor/dashboard/?billing=cancelled',
+            'metadata'     => [ 'frp_pro_id' => (string) $pro_id, 'tier' => $tier ],
+            'subscription_data' => [
+                'metadata' => [ 'frp_pro_id' => (string) $pro_id, 'tier' => $tier ],
+            ],
         ] );
-        $customer_id = $customer->id;
-        update_user_meta( get_current_user_id(), 'frp_stripe_customer_id', $customer_id );
+
+        return [ 'checkout_url' => $session->url, 'session_id' => $session->id ];
+    } catch ( \Stripe\Exception\ApiErrorException $e ) {
+        return new WP_Error( 'stripe_error', $e->getMessage(), [ 'status' => 502 ] );
+    } catch ( \Throwable $e ) {
+        return new WP_Error( 'stripe_error', 'Unexpected billing error.', [ 'status' => 500 ] );
     }
-
-    $base = home_url();
-    $session = \Stripe\Checkout\Session::create( [
-        'mode'         => 'subscription',
-        'customer'     => $customer_id,
-        'line_items'   => [ [ 'price' => $price_id, 'quantity' => 1 ] ],
-        'success_url'  => $base . '/contractor/dashboard/?billing=success&session_id={CHECKOUT_SESSION_ID}',
-        'cancel_url'   => $base . '/contractor/dashboard/?billing=cancelled',
-        'metadata'     => [ 'frp_pro_id' => (string) $pro_id, 'tier' => $tier ],
-        'subscription_data' => [
-            'metadata' => [ 'frp_pro_id' => (string) $pro_id, 'tier' => $tier ],
-        ],
-    ] );
-
-    return [ 'checkout_url' => $session->url, 'session_id' => $session->id ];
 }
