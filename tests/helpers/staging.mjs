@@ -80,3 +80,28 @@ export async function countPros() {
   const { status, body } = await frpGet('/wp-json/wp/v2/restoration_pro?per_page=100&status=any', { auth: true });
   return (status === 200 && Array.isArray(body)) ? body.length : 0;
 }
+
+/**
+ * Create an frp_claim_review ticket for testing admin endpoints.
+ * fields: { match_tier?, candidate_pro_id?, reason?, applicant_json? }
+ */
+export async function createReviewTicket(fields = {}) {
+  const title = 'Review: fixture-' + Date.now();
+  const { status, body } = await frpPost('/wp-json/wp/v2/frp_claim_review', {
+    title,
+    status: 'publish',
+  }, { auth: true });
+  if (status !== 201) throw new Error(`createReviewTicket post failed: ${status} ${JSON.stringify(body)}`);
+  const ticketId = body.id;
+  await frpPost('/wp-json/frp/v1/admin/set-post-meta', {
+    post_id: ticketId,
+    meta: {
+      match_tier:       fields.match_tier       ?? 'weak',
+      candidate_pro_id: String(fields.candidate_pro_id ?? 0),
+      reason:           fields.reason           ?? 'test fixture',
+      applicant_json:   fields.applicant_json   ?? '{}',
+      review_status:    'open',
+    },
+  }, { auth: true });
+  return ticketId;
+}

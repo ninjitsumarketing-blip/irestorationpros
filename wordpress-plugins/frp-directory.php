@@ -849,6 +849,18 @@ function frp_register_rest_routes() {
         'callback'            => 'frp_claim_verify_handler',
         'permission_callback' => '__return_true',
     ] );
+
+    // ── Admin: approve or reject a claim-review ticket ───────────
+    register_rest_route( 'frp/v1', '/admin/claim-review/(?P<id>\d+)/approve', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_claim_review_approve_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+    register_rest_route( 'frp/v1', '/admin/claim-review/(?P<id>\d+)/reject', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_claim_review_reject_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
 }
 add_action( 'rest_api_init', 'frp_register_rest_routes' );
 
@@ -1572,6 +1584,57 @@ function frp_apply_open_review_ticket( array $applicant, array $match ) : int {
     return $ticket_id;
 }
 
+function frp_claim_review_approve_handler( WP_REST_Request $r ) {
+    $tid = (int) $r['id'];
+    if ( get_post_type( $tid ) !== 'frp_claim_review' ) {
+        return new WP_Error( 'not_found', 'Ticket not found', [ 'status' => 404 ] );
+    }
+    if ( (string) get_post_meta( $tid, 'review_status', true ) === 'resolved' ) {
+        return new WP_Error( 'conflict', 'Already resolved', [ 'status' => 409 ] );
+    }
+    $applicant = json_decode( (string) get_post_meta( $tid, 'applicant_json', true ), true );
+    if ( ! is_array( $applicant ) ) {
+        return new WP_Error( 'bad_data', 'Malformed applicant data', [ 'status' => 500 ] );
+    }
+
+    $pro_id = (int) get_post_meta( $tid, 'candidate_pro_id', true );
+    $match  = [
+        'tier'   => (string) get_post_meta( $tid, 'match_tier', true ),
+        'pro_id' => $pro_id,
+        'reason' => 'admin-approved',
+    ];
+    // false = don't open a second review ticket (we already are the review ticket)
+    $result = frp_apply_initiate_claim( $applicant, $match, false );
+
+    frp_claim_review_mark_resolved( $tid, 'approved' );
+    return rest_ensure_response( [ 'ticket_id' => $tid, 'outcome' => 'approved', 'claim' => $result ] );
+}
+
+function frp_claim_review_reject_handler( WP_REST_Request $r ) {
+    $tid = (int) $r['id'];
+    if ( get_post_type( $tid ) !== 'frp_claim_review' ) {
+        return new WP_Error( 'not_found', 'Ticket not found', [ 'status' => 404 ] );
+    }
+    if ( (string) get_post_meta( $tid, 'review_status', true ) === 'resolved' ) {
+        return new WP_Error( 'conflict', 'Already resolved', [ 'status' => 409 ] );
+    }
+    $applicant = json_decode( (string) get_post_meta( $tid, 'applicant_json', true ), true );
+    if ( ! is_array( $applicant ) ) {
+        return new WP_Error( 'bad_data', 'Malformed applicant data', [ 'status' => 500 ] );
+    }
+
+    $result = frp_apply_insert_new( $applicant );
+    frp_claim_review_mark_resolved( $tid, 'rejected' );
+    return rest_ensure_response( [ 'ticket_id' => $tid, 'outcome' => 'rejected', 'insert' => $result ] );
+}
+
+function frp_claim_review_mark_resolved( int $tid, string $outcome ) : void {
+    update_post_meta( $tid, 'review_status',   'resolved' );
+    update_post_meta( $tid, 'review_outcome',  $outcome );
+    update_post_meta( $tid, 'resolved_by',     get_current_user_id() );
+    update_post_meta( $tid, 'resolved_at',     gmdate( 'c' ) );
+}
+
 /**
  * POST /frp/v1/claim/{id}
  *
@@ -2270,3 +2333,35 @@ add_action( 'init', function() {
         add_role( 'restoration_pro', 'Restoration Pro', [ 'read' => true ] );
     }
 } );
+
+// ── Admin list-table columns for frp_claim_review ────────────────────────────
+add_filter( 'manage_frp_claim_review_posts_columns', function ( array $cols ) : array {
+    return [
+        'cb'            => $cols['cb'] ?? '',
+        'title'         => 'Applicant business',
+        'match_tier'    => 'Tier',
+        'candidate'     => 'Candidate pro',
+        'reason'        => 'Reason',
+        'review_status' => 'Status',
+        'date'          => 'Submitted',
+    ];
+} );
+add_action( 'manage_frp_claim_review_posts_custom_column', function ( string $col, int $post_id ) : void {
+    switch ( $col ) {
+        case 'match_tier':
+            echo esc_html( get_post_meta( $post_id, 'match_tier', true ) );
+            break;
+        case 'candidate':
+            $pid = (int) get_post_meta( $post_id, 'candidate_pro_id', true );
+            echo $pid
+                ? sprintf( '<a href="%s">%s</a>', esc_url( get_edit_post_link( $pid ) ), esc_html( get_the_title( $pid ) ) )
+                : '—';
+            break;
+        case 'reason':
+            echo esc_html( get_post_meta( $post_id, 'reason', true ) );
+            break;
+        case 'review_status':
+            echo esc_html( get_post_meta( $post_id, 'review_status', true ) ?: 'open' );
+            break;
+    }
+}, 10, 2 );
