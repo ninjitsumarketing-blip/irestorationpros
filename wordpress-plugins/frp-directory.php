@@ -174,6 +174,7 @@ function frp_register_lead_meta() {
         'lead_status', 'lead_source', 'lead_assigned_pros',
         'lead_update_token', 'lead_update_token_expiry',
         'lead_page_url', 'dispatch_tier', 'date_submitted',
+        'lead_customer_notes',
     ];
     foreach ( $string_fields as $key ) {
         register_post_meta( 'frp_lead', $key, [
@@ -1355,54 +1356,56 @@ function frp_fire_lead_webhook( $post_id, $score, $dispatch_result, $lead_data )
 }
 
 // ─────────────────────────────────────────────────────────────
-// LEAD ROUTE B — Update Lead (Step 2: name + address)
+// LEAD ROUTE B — Update Lead (cancel / add_notes via magic link)
 // POST /wp-json/frp/v1/leads/{id}
+// Auth: per-lead token in body (homeowner magic-link flow)
 // ─────────────────────────────────────────────────────────────
 function frp_lead_update_handler( WP_REST_Request $request ) {
-
-    // 1. Token validation
-    if ( ! defined( 'FRP_LEAD_SECRET' ) ) {
-        return new WP_Error( 'forbidden', 'Endpoint not configured.', [ 'status' => 403 ] );
-    }
-    $header_token = $request->get_header( 'X-FRP-Lead-Token' );
-    if ( ! $header_token || ! hash_equals( FRP_LEAD_SECRET, $header_token ) ) {
-        return new WP_Error( 'forbidden', 'Invalid token.', [ 'status' => 403 ] );
-    }
-
-    // 2. Validate post ID
-    $post_id = (int) $request->get_param( 'id' );
-    $post    = get_post( $post_id );
-    if ( ! $post || $post->post_type !== 'frp_lead' || $post->post_status !== 'publish' ) {
+    $lead_id = (int) $request['id'];
+    if ( ! $lead_id || get_post_type( $lead_id ) !== 'frp_lead' ) {
         return new WP_Error( 'not_found', 'Lead not found.', [ 'status' => 404 ] );
     }
 
-    // 3. Verify update token (body param, not header)
-    $body_token = sanitize_text_field( $request->get_param( 'lead_update_token' ) ?? '' );
-    $stored_token  = get_post_meta( $post_id, 'lead_update_token', true );
-    $stored_expiry = get_post_meta( $post_id, 'lead_update_token_expiry', true );
-
-    if ( ! $stored_token || ! $body_token || ! hash_equals( $stored_token, $body_token ) ) {
-        return new WP_Error( 'forbidden', 'Invalid update token.', [ 'status' => 403 ] );
+    // Per-lead rate limit: 10 attempts per hour (enumeration guard)
+    if ( ! frp_check_rate_limit( 'lead_update_' . $lead_id, 10, HOUR_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many attempts.', [ 'status' => 429 ] );
     }
 
-    if ( $stored_expiry && strtotime( $stored_expiry ) < time() ) {
-        return new WP_Error( 'forbidden', 'Session expired. Please refresh and try again.', [ 'status' => 403 ] );
+    $token  = (string) ( $request->get_param( 'token' ) ?? '' );
+    $stored = (string) get_post_meta( $lead_id, 'lead_update_token', true );
+    $expiry = (string) get_post_meta( $lead_id, 'lead_update_token_expiry', true );
+
+    if ( ! $token || ! $stored || ! hash_equals( $stored, $token ) ) {
+        return new WP_Error( 'forbidden', 'Invalid token.', [ 'status' => 403 ] );
+    }
+    if ( ! $expiry || strtotime( $expiry ) < time() ) {
+        return new WP_Error( 'forbidden', 'Token expired.', [ 'status' => 403 ] );
     }
 
-    // 4. Sanitize update fields
-    $name    = sanitize_text_field( $request->get_param( 'name' )    ?? '' );
-    $address = sanitize_text_field( $request->get_param( 'address' ) ?? '' );
-    $city    = sanitize_text_field( $request->get_param( 'city' )    ?? '' );
+    $action = sanitize_text_field( $request->get_param( 'action' ) ?? '' );
+    $valid_actions = [ 'cancel', 'add_notes' ];
+    if ( ! in_array( $action, $valid_actions, true ) ) {
+        return new WP_Error( 'bad_request', 'Invalid action. Use cancel or add_notes.', [ 'status' => 400 ] );
+    }
 
-    // 5. Update meta
-    if ( $name )    update_post_meta( $post_id, 'lead_name',    $name );
-    if ( $address ) update_post_meta( $post_id, 'lead_address', $address );
-    if ( $city )    update_post_meta( $post_id, 'lead_city',    $city );
+    if ( $action === 'cancel' ) {
+        update_post_meta( $lead_id, 'lead_status', 'cancelled' );
+        do_action( 'frp_lead_cancelled', $lead_id );
+        return rest_ensure_response( [ 'status' => 'cancelled', 'lead_id' => $lead_id ] );
+    }
 
-    return rest_ensure_response( [
-        'success' => true,
-        'lead_id' => $post_id,
-    ] );
+    if ( $action === 'add_notes' ) {
+        $notes = sanitize_textarea_field( $request->get_param( 'notes' ) ?? '' );
+        if ( strlen( $notes ) > 1000 ) {
+            return new WP_Error( 'bad_request', 'Notes too long (max 1000 chars).', [ 'status' => 400 ] );
+        }
+        $existing = (string) get_post_meta( $lead_id, 'lead_customer_notes', true );
+        $separator = $existing ? "\n---\n" : '';
+        update_post_meta( $lead_id, 'lead_customer_notes', $existing . $separator . $notes );
+        return rest_ensure_response( [ 'status' => 'notes_added', 'lead_id' => $lead_id ] );
+    }
+
+    return new WP_Error( 'server_error', 'Unreachable.', [ 'status' => 500 ] );
 }
 
 function frp_publish_page_handler( WP_REST_Request $request ) {
