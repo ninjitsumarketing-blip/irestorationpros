@@ -1,5 +1,24 @@
 import { frpPost, frpGet, frpDelete, frpPostLead } from './wp-client.mjs';
 
+// Authenticate as the pro user (restoration_pro role) for billing/contractor tests.
+// Returns { auth: 'pro', pro_id: number }.
+// pro_id will be 0 if the get-user-meta admin endpoint is not yet provisioned (acceptable for Task 1.6).
+export async function loginAsPro(username) {
+  // Verify pro auth works — get user info
+  const { status, body } = await frpGet('/wp-json/wp/v2/users/me', { auth: 'pro' });
+  if (status !== 200) {
+    throw new Error(`loginAsPro: authentication failed for "${username}": ${status} ${JSON.stringify(body)}`);
+  }
+  const userId = body.id;
+  // Fetch bound frp_pro_id from user meta via admin endpoint (if available).
+  const metaRes = await frpGet(
+    `/wp-json/frp/v1/admin/get-user-meta?user_id=${userId}&key=frp_pro_id`,
+    { auth: true }
+  );
+  const pro_id = metaRes.status === 200 ? Number(metaRes.body.value) || 0 : 0;
+  return { auth: 'pro', pro_id };
+}
+
 // Create a minimal restoration_pro post for test fixture.
 // opts: { business_name?, meta: {...} }
 // Returns the created post object (has .id).

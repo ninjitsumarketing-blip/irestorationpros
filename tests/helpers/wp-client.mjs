@@ -33,10 +33,16 @@ if (!process.env.FRP_STAGING_SUBSCRIBER_USERNAME || process.env.FRP_STAGING_SUBS
   process.emitWarning('[wp-client] FRP_STAGING_SUBSCRIBER_USERNAME not configured — subscriber auth tests will get 401 (expected until Task 1.3)');
 }
 
-// `auth`: false = no auth, true = admin, 'subscriber' = non-admin user.
+// Pro user (restoration_pro role) for billing/contractor tests.
+const PRO_AUTH = 'Basic ' + Buffer.from(
+  `${process.env.FRP_STAGING_PRO_USERNAME}:${String(process.env.FRP_STAGING_PRO_APP_PASSWORD || '').replace(/\s+/g, '')}`
+).toString('base64');
+
+// `auth`: false = no auth, true = admin, 'subscriber' = non-admin user, 'pro' = restoration_pro role.
 function resolveAuth(auth) {
   if (auth === true) return AUTH;
   if (auth === 'subscriber') return SUB_AUTH;
+  if (auth === 'pro') return PRO_AUTH;
   return null;
 }
 
