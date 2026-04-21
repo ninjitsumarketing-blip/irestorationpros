@@ -81,6 +81,16 @@ export async function countPros() {
   return (status === 200 && Array.isArray(body)) ? body.length : 0;
 }
 
+// Delete a single post meta key via admin endpoint.
+// Used to simulate pre-migration state (e.g. no claim_status row).
+export async function deleteMeta(postId, key) {
+  const { status, body } = await frpPost('/wp-json/frp/v1/admin/delete-post-meta', {
+    post_id: postId,
+    key,
+  }, { auth: true });
+  if (status !== 200) throw new Error(`deleteMeta(${postId}, ${key}) failed: ${status} ${JSON.stringify(body)}`);
+}
+
 /**
  * Create an frp_claim_review ticket for testing admin endpoints.
  * fields: { match_tier?, candidate_pro_id?, reason?, applicant_json? }

@@ -7,8 +7,9 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-$frp_match_path  = plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
-$frp_emails_path = plugin_dir_path( __FILE__ ) . 'frp-emails.php';
+$frp_match_path      = plugin_dir_path( __FILE__ ) . 'includes/frp-match.php';
+$frp_emails_path     = plugin_dir_path( __FILE__ ) . 'frp-emails.php';
+$frp_migrations_path = plugin_dir_path( __FILE__ ) . 'includes/frp-migrations.php';
 if ( file_exists( $frp_match_path ) ) {
     require_once $frp_match_path;
 } else {
@@ -19,7 +20,12 @@ if ( file_exists( $frp_emails_path ) ) {
 } else {
     error_log( 'FRP: missing frp-emails.php at ' . $frp_emails_path );
 }
-unset( $frp_match_path, $frp_emails_path );
+if ( file_exists( $frp_migrations_path ) ) {
+    require_once $frp_migrations_path;
+} else {
+    error_log( 'FRP: missing includes/frp-migrations.php at ' . $frp_migrations_path );
+}
+unset( $frp_match_path, $frp_emails_path, $frp_migrations_path );
 
 // ─────────────────────────────────────────────────────────────
 // INJECT FRP_LEAD_TOKEN — outputs window.FRP_LEAD_TOKEN on every
@@ -850,6 +856,14 @@ function frp_register_rest_routes() {
         'permission_callback' => '__return_true',
     ] );
 
+    // ── Admin: delete a single post meta key (test fixture teardown) ────────
+    // Uses POST per R3 — SiteGround WAF strips auth on HTTP DELETE requests.
+    register_rest_route( 'frp/v1', '/admin/delete-post-meta', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_delete_post_meta_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
     // ── Admin: approve or reject a claim-review ticket ───────────
     register_rest_route( 'frp/v1', '/admin/claim-review/(?P<id>\d+)/approve', [
         'methods'             => 'POST',
@@ -947,6 +961,16 @@ function frp_admin_delete_post_handler( WP_REST_Request $r ) {
         return rest_ensure_response( [ 'deleted' => true, 'id' => $post_id ] );
     }
     return rest_ensure_response( [ 'deleted' => true, 'id' => $post_id ] );
+}
+
+function frp_admin_delete_post_meta_handler( WP_REST_Request $r ) {
+    $post_id = (int) $r->get_param( 'post_id' );
+    $key     = sanitize_key( (string) $r->get_param( 'key' ) );
+    if ( ! $post_id || ! $key ) {
+        return new WP_Error( 'bad_request', 'post_id and key are required', [ 'status' => 400 ] );
+    }
+    delete_post_meta( $post_id, $key );
+    return rest_ensure_response( [ 'deleted' => true, 'post_id' => $post_id, 'key' => $key ] );
 }
 
 // ─────────────────────────────────────────────────────────────
