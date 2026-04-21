@@ -38,8 +38,10 @@ test('weak match → pending_manual_review, admin review ticket created', async 
 
 test('no match → original insert behavior, status pending_review', async () => {
   const countBefore = await countPros();
+  // Unique name so repeated runs don't accumulate drafts that the weak-tier
+  // fuzzy matcher picks up as a ≥0.90 similarity hit on the next run.
   const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
-    business_name: 'Brand New LLC Never Seen XYZ', contact_email: 'new@new.test',
+    business_name: `Unique Co ${Date.now()} Never Seen`, contact_email: 'new@new.test',
     dispatch_phone: '5550001111', state: 'NV',
   });
   const countAfter = await countPros();

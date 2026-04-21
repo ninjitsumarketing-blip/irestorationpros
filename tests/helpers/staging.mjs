@@ -34,6 +34,9 @@ export async function resetTestPros() {
   if (status === 200 && Array.isArray(body)) {
     await Promise.all(body.map(p => deleteTestPro(p.id)));
   }
+  // Delete apply-created draft pros (joined_source=apply_new) so they don't
+  // accumulate and trigger false matcher hits on repeated runs.
+  await frpPost('/wp-json/frp/v1/admin/cleanup-apply-drafts', {}, { auth: true }).catch(() => {});
   // Flush frp_rl_* transients — silently ignore errors (endpoint may not exist
   // on older deploys; tests will just hit rate limits naturally in that case).
   await frpPost('/wp-json/frp/v1/admin/reset-rate-limits', {}, { auth: true }).catch(() => {});

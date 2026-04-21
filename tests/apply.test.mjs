@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { frpPost } from './helpers/wp-client.mjs';
 
 test('apply creates a draft pro and returns application id', async () => {
+  // Use a unique suffix so repeated runs don't accumulate drafts that
+  // trigger false matcher hits (license_number strong-match or name weak-match).
+  const uid = Date.now();
   const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
-    business_name: 'Acme Restoration LLC',
+    business_name: `Acme Restoration ${uid}`,
     contact_name: 'Jane Doe',
     contact_email: 'jane@acmerestoration.test',
     dispatch_phone: '5551234567',
-    license_number: 'CSLB-12345',
+    license_number: `CSLB-${uid}`,
     years_in_business: 8,
     services: ['water-damage', 'mold-remediation'],
     service_area_zips: '90210,90211',

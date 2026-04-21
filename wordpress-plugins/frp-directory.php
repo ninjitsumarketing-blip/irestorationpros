@@ -864,6 +864,15 @@ function frp_register_rest_routes() {
         'permission_callback' => 'frp_is_administrator',
     ] );
 
+    // ── Admin: delete apply-created draft pros (test-suite teardown) ─────
+    // Removes restoration_pro drafts with joined_source=apply_new so repeated
+    // test runs don't accumulate draft pros that later trigger false matcher hits.
+    register_rest_route( 'frp/v1', '/admin/cleanup-apply-drafts', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_cleanup_apply_drafts_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
     // ── Admin: flush rate-limit transients (test-suite teardown) ────────
     // Deletes all frp_rl_* transients so repeated test runs from the same IP
     // don't deplete per-hour quotas. Admin-only; never expose on production.
@@ -980,6 +989,24 @@ function frp_admin_delete_post_meta_handler( WP_REST_Request $r ) {
     }
     delete_post_meta( $post_id, $key );
     return rest_ensure_response( [ 'deleted' => true, 'post_id' => $post_id, 'key' => $key ] );
+}
+
+function frp_admin_cleanup_apply_drafts_handler( WP_REST_Request $r ) {
+    global $wpdb;
+    $ids = $wpdb->get_col(
+        "SELECT p.ID FROM {$wpdb->posts} p
+         JOIN {$wpdb->postmeta} m
+           ON m.post_id = p.ID
+          AND m.meta_key = 'joined_source'
+          AND m.meta_value = 'apply_new'
+         WHERE p.post_type = 'restoration_pro'
+           AND p.post_status IN ('draft','pending')"
+    );
+    $deleted = 0;
+    foreach ( $ids as $id ) {
+        if ( wp_delete_post( (int) $id, true ) ) $deleted++;
+    }
+    return rest_ensure_response( [ 'deleted' => $deleted ] );
 }
 
 function frp_admin_reset_rate_limits_handler( WP_REST_Request $r ) {
