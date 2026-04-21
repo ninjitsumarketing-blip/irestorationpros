@@ -864,6 +864,15 @@ function frp_register_rest_routes() {
         'permission_callback' => 'frp_is_administrator',
     ] );
 
+    // ── Admin: flush rate-limit transients (test-suite teardown) ────────
+    // Deletes all frp_rl_* transients so repeated test runs from the same IP
+    // don't deplete per-hour quotas. Admin-only; never expose on production.
+    register_rest_route( 'frp/v1', '/admin/reset-rate-limits', [
+        'methods'             => 'POST',
+        'callback'            => 'frp_admin_reset_rate_limits_handler',
+        'permission_callback' => 'frp_is_administrator',
+    ] );
+
     // ── Admin: approve or reject a claim-review ticket ───────────
     register_rest_route( 'frp/v1', '/admin/claim-review/(?P<id>\d+)/approve', [
         'methods'             => 'POST',
@@ -971,6 +980,16 @@ function frp_admin_delete_post_meta_handler( WP_REST_Request $r ) {
     }
     delete_post_meta( $post_id, $key );
     return rest_ensure_response( [ 'deleted' => true, 'post_id' => $post_id, 'key' => $key ] );
+}
+
+function frp_admin_reset_rate_limits_handler( WP_REST_Request $r ) {
+    global $wpdb;
+    $deleted = $wpdb->query(
+        "DELETE FROM {$wpdb->options}
+         WHERE option_name LIKE '_transient_frp_rl_%'
+            OR option_name LIKE '_transient_timeout_frp_rl_%'"
+    );
+    return rest_ensure_response( [ 'deleted_rows' => (int) $deleted ] );
 }
 
 // ─────────────────────────────────────────────────────────────

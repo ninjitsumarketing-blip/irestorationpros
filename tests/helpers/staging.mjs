@@ -26,11 +26,17 @@ export async function deleteTestPro(id) {
 }
 
 // Delete all restoration_pro posts that have meta test_fixture=1.
-// Call in afterEach / test cleanup to leave staging clean.
+// Also flushes rate-limit transients so repeated test runs from the same IP
+// don't exhaust per-hour quotas (e.g. the 20 req/hr /apply limit).
+// Call in test.before / test.after for cleanup.
 export async function resetTestPros() {
   const { status, body } = await frpGet('/wp-json/wp/v2/restoration_pro?meta_key=test_fixture&meta_value=1&per_page=100', { auth: true });
-  if (status !== 200 || !Array.isArray(body)) return;
-  await Promise.all(body.map(p => deleteTestPro(p.id)));
+  if (status === 200 && Array.isArray(body)) {
+    await Promise.all(body.map(p => deleteTestPro(p.id)));
+  }
+  // Flush frp_rl_* transients — silently ignore errors (endpoint may not exist
+  // on older deploys; tests will just hit rate limits naturally in that case).
+  await frpPost('/wp-json/frp/v1/admin/reset-rate-limits', {}, { auth: true }).catch(() => {});
 }
 
 // Create a seeded restoration_pro with arbitrary meta fields (including private ones).
