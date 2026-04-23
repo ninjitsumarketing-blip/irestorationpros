@@ -175,6 +175,7 @@ function frp_register_lead_meta() {
         'lead_update_token', 'lead_update_token_expiry',
         'lead_page_url', 'dispatch_tier', 'date_submitted',
         'lead_customer_notes',
+        'lead_contact_email', 'property_address',   // new — profile_form fields
     ];
     foreach ( $string_fields as $key ) {
         register_post_meta( 'frp_lead', $key, [
@@ -184,6 +185,12 @@ function frp_register_lead_meta() {
             'auth_callback' => function() { return current_user_can( 'manage_options' ); },
         ] );
     }
+    register_post_meta( 'frp_lead', 'preferred_pro_id', [
+        'show_in_rest'  => false,
+        'single'        => true,
+        'type'          => 'integer',
+        'auth_callback' => function() { return current_user_can( 'manage_options' ); },
+    ] );
     register_post_meta( 'frp_lead', 'lead_score', [
         'show_in_rest'  => false,
         'single'        => true,
@@ -1068,7 +1075,7 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     $valid_urgency  = [ 'now', '24hrs', 'older' ];
     $valid_property = [ 'residential', 'commercial' ];
     $valid_insurance= [ 'yes', 'no', 'not-sure' ];
-    $valid_sources  = [ 'guided_flow', 'followup_modal', 'emergency_flow' ];
+    $valid_sources  = [ 'guided_flow', 'followup_modal', 'emergency_flow', 'profile_form' ];
 
     $source   = in_array( $request->get_param( 'source' ), $valid_sources, true )
                     ? $request->get_param( 'source' ) : 'guided_flow';
@@ -2123,7 +2130,7 @@ function frp_render_meta_box( $post ) {
     $sections = [
         '⭐ Featured Listing (Paid)' => [
             'listing_status'      => [ 'Status — active / inactive / pending', 'text' ],
-            'listing_tier'        => [ 'Tier — free / featured / premium', 'text' ],
+            'listing_tier'        => [ 'Tier — free / basic / paid / featured / premium', 'text' ],
             'is_paid_listing'     => [ 'Is Paid Listing (1 = yes, 0 = no)', 'text' ],
             'listing_expires'     => [ 'Listing Expires (YYYY-MM-DD)', 'text' ],
             'featured_tagline'    => [ 'Featured Tagline (shown on card + profile)', 'text' ],
