@@ -16,7 +16,7 @@ function profilePayload(overrides = {}) {
     property_type: 'residential',
     has_insurance: 'not-sure',
     source: 'profile_form',
-    preferred_pro_id: proId,
+    preferred_pro_id: proId,   // resolved at call-time — seeded by test.before
     ...overrides,
   };
 }
