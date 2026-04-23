@@ -1065,11 +1065,6 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
         return new WP_Error( 'forbidden', 'Invalid token.', [ 'status' => 403 ] );
     }
 
-    // 2. Rate limiting — 3 submissions per IP per 15 minutes
-    if ( ! frp_check_rate_limit( 'lead_create', 3, 15 * MINUTE_IN_SECONDS ) ) {
-        return new WP_Error( 'rate_limited', 'Too many requests. Please try again shortly.', [ 'status' => 429 ] );
-    }
-
     // 3. Sanitize and validate inputs
     $valid_services = [ 'water-damage','mold-remediation','fire-damage','storm-damage','sewage-cleanup','structural','biohazard-cleanup' ];
     $valid_urgency  = [ 'now', '24hrs', 'older' ];
@@ -1079,6 +1074,13 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
 
     $source   = in_array( $request->get_param( 'source' ), $valid_sources, true )
                     ? $request->get_param( 'source' ) : 'guided_flow';
+
+    // 2. Rate limiting — profile_form gets its own higher-limit bucket (homeowners browse multiple pros)
+    $rl_bucket = ( $source === 'profile_form' ) ? 'lead_create_profile' : 'lead_create';
+    $rl_limit  = ( $source === 'profile_form' ) ? 10 : 3;
+    if ( ! frp_check_rate_limit( $rl_bucket, $rl_limit, 15 * MINUTE_IN_SECONDS ) ) {
+        return new WP_Error( 'rate_limited', 'Too many requests. Please try again shortly.', [ 'status' => 429 ] );
+    }
 
     // For emergency_flow, use defaults for scoring fields if not provided
     $is_emergency = ( $source === 'emergency_flow' );
@@ -1101,6 +1103,10 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     // assigned_pro for follow-up modal
     $assigned_pro = (int) ( $request->get_param( 'assigned_pro' ) ?? 0 );
 
+    // New params for profile_form
+    $preferred_pro_id = absint( $request->get_param( 'preferred_pro_id' ) ?? 0 );
+    $property_address = sanitize_text_field( $request->get_param( 'property_address' ) ?? '' );
+
     // Phone is required (except followup_modal can supply email instead)
     if ( ! $phone || ! preg_match( '/^\+?[\d\s\-().]{7,20}$/', $phone ) ) {
         if ( $source !== 'followup_modal' || ! $email ) {
@@ -1114,6 +1120,22 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
 
     if ( $email && ! is_email( $email ) ) {
         $email = ''; // Silently clear invalid email rather than reject
+    }
+
+    // profile_form: overwrite $email from lead_contact_email param; validate strictly.
+    // IMPORTANT: After this block, $email holds the validated homeowner email for ALL
+    // downstream code — the lead_email meta write (step 10), the webhook $lead_data['email'],
+    // and the duplicate-detection call (which is skipped anyway for profile_form).
+    // Do NOT introduce a separate variable — reusing $email keeps all downstream consistent.
+    if ( $source === 'profile_form' ) {
+        $email = sanitize_email( $request->get_param( 'lead_contact_email' ) ?? '' );
+        if ( ! $email || ! is_email( $email ) ) {
+            return new WP_Error( 'bad_request', 'A valid email address is required.', [ 'status' => 400 ] );
+        }
+        // preferred_pro_id is required for profile_form; 0 means absent (absint returns 0 for null/'')
+        if ( ! $preferred_pro_id || get_post_type( $preferred_pro_id ) !== 'restoration_pro' ) {
+            return new WP_Error( 'bad_request', 'A valid pro ID is required.', [ 'status' => 400 ] );
+        }
     }
 
     if ( ! $service ) {
@@ -1139,26 +1161,29 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     }
 
     // 5. Duplicate detection: same phone OR email, status=new, within 24 hours
-    $dup_id = frp_find_duplicate_lead( $phone, $email );
-    if ( $dup_id ) {
-        // Refresh token if needed
-        $existing_expiry = get_post_meta( $dup_id, 'lead_update_token_expiry', true );
-        if ( ! $existing_expiry || strtotime( $existing_expiry ) < time() ) {
-            $tok = frp_generate_lead_token();
-            update_post_meta( $dup_id, 'lead_update_token', $tok['token'] );
-            update_post_meta( $dup_id, 'lead_update_token_expiry', $tok['expiry'] );
-            $return_token = $tok['token'];
-        } else {
-            $return_token = get_post_meta( $dup_id, 'lead_update_token', true );
+    // Skipped for profile_form — each pro-specific submission is an independent intent signal
+    if ( $source !== 'profile_form' ) {
+        $dup_id = frp_find_duplicate_lead( $phone, $email );
+        if ( $dup_id ) {
+            // Refresh token if needed
+            $existing_expiry = get_post_meta( $dup_id, 'lead_update_token_expiry', true );
+            if ( ! $existing_expiry || strtotime( $existing_expiry ) < time() ) {
+                $tok = frp_generate_lead_token();
+                update_post_meta( $dup_id, 'lead_update_token', $tok['token'] );
+                update_post_meta( $dup_id, 'lead_update_token_expiry', $tok['expiry'] );
+                $return_token = $tok['token'];
+            } else {
+                $return_token = get_post_meta( $dup_id, 'lead_update_token', true );
+            }
+            $has_coverage = ! empty( json_decode( get_post_meta( $dup_id, 'lead_assigned_pros', true ), true ) );
+            return rest_ensure_response( [
+                'success'           => true,
+                'lead_id'           => $dup_id,
+                'lead_update_token' => $return_token,
+                'has_coverage'      => $has_coverage,
+            ] );
         }
-        $has_coverage = ! empty( json_decode( get_post_meta( $dup_id, 'lead_assigned_pros', true ), true ) );
-        return rest_ensure_response( [
-            'success'           => true,
-            'lead_id'           => $dup_id,
-            'lead_update_token' => $return_token,
-            'has_coverage'      => $has_coverage,
-        ] );
-    }
+    }   // ← end profile_form duplicate-detection guard
 
     // 6. Calculate score
     $score = frp_calculate_lead_score( $urgency, $insurance, $property );
@@ -1209,14 +1234,41 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     if ( $assigned_pro ) {
         $meta_map['lead_assigned_pros'] = wp_json_encode( [ $assigned_pro ] );
     }
+    // New fields — written unconditionally.
+    // property_address: empty string for submissions that don't include it (acceptable).
+    // lead_contact_email: for profile_form $email was already overwritten above with the
+    //   homeowner email; for other sources $email holds whatever the 'email' param was
+    //   (may be empty string) — storing it in lead_contact_email is harmless per spec.
+    $meta_map['property_address']    = $property_address;
+    $meta_map['lead_contact_email']  = $email;
+    if ( $preferred_pro_id ) {
+        $meta_map['preferred_pro_id'] = $preferred_pro_id;
+    }
     foreach ( $meta_map as $key => $value ) {
         update_post_meta( $post_id, $key, $value );
     }
 
-    // 11. Cascading dispatch (skip for followup_modal — pro already known)
+    // 11. Cascading dispatch (skip for followup_modal and profile_form — pro already known)
     $dispatch_result = [ 'pros' => [], 'tier' => 'no_coverage', 'has_coverage' => false ];
-    if ( $zip && $source !== 'followup_modal' ) {
+    if ( $zip && $source !== 'followup_modal' && $source !== 'profile_form' ) {
         $dispatch_result = frp_find_dispatch_pros( $zip, $service );
+    }
+    // For profile_form: build dispatch result from the preferred pro's meta
+    // so frp_fire_lead_webhook() can populate dispatched_pros with real contact info.
+    // The unconditional update_post_meta( $post_id, 'lead_assigned_pros', ... ) at the next
+    // block runs AFTER this. With $dispatch_result['pros'] set to the preferred pro,
+    // it correctly writes wp_json_encode([$preferred_pro_id]). No change needed there.
+    if ( $source === 'profile_form' && $preferred_pro_id ) {
+        $dispatch_result = [
+            'has_coverage' => true,
+            'tier'         => 'direct',
+            'pros'         => [ [
+                'post_id'        => $preferred_pro_id,
+                'name'           => get_post_meta( $preferred_pro_id, 'business_name', true ) ?: get_the_title( $preferred_pro_id ),
+                'dispatch_phone' => get_post_meta( $preferred_pro_id, 'phone', true ) ?: '',
+                'dispatch_email' => get_post_meta( $preferred_pro_id, 'contact_email', true ) ?: '',
+            ] ],
+        ];
     }
 
     update_post_meta( $post_id, 'lead_assigned_pros', wp_json_encode(
@@ -1226,15 +1278,17 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
 
     // 12. Fire Make.com webhook (non-blocking)
     frp_fire_lead_webhook( $post_id, $score, $dispatch_result, [
-        'phone'        => $phone,
-        'email'        => $email,
-        'zip'          => $zip,
-        'service'      => $service,
-        'urgency'      => $urgency,
-        'property'     => $property,
-        'insurance'    => $insurance,
-        'source'       => $source,
-        'date'         => $now,
+        'phone'            => $phone,
+        'email'            => $email,
+        'zip'              => $zip,
+        'service'          => $service,
+        'urgency'          => $urgency,
+        'property'         => $property,
+        'insurance'        => $insurance,
+        'source'           => $source,
+        'date'             => $now,
+        'preferred_pro_id' => $preferred_pro_id,  // new
+        'property_address' => $property_address,  // new
     ] );
     update_post_meta( $post_id, 'lead_make_sent', 1 );
 
@@ -1352,6 +1406,8 @@ function frp_fire_lead_webhook( $post_id, $score, $dispatch_result, $lead_data )
         'date_submitted'   => $lead_data['date'],
         'dispatched_pros'  => $pros_payload,
         'site_url'         => get_site_url(),
+        'preferred_pro_id' => $lead_data['preferred_pro_id'] ?? 0,
+        'property_address' => $lead_data['property_address'] ?? '',
     ];
 
     wp_remote_post( $webhook_url, [
