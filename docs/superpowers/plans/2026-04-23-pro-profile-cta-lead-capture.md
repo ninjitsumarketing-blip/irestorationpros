@@ -504,6 +504,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Register this file as the template for restoration_pro single posts.
 // The file acts as both plugin (registers the filter) and template (renders the page).
+// __FILE__ (not a separate view file) keeps deployment to a single file upload via SiteGround
+// File Manager; the did_action('wp') guard below prevents the rendering code from running
+// during mu-plugin boot — it only executes when WordPress loads the file as a template.
 add_filter( 'template_include', function( $template ) {
     if ( is_singular( 'restoration_pro' ) ) {
         return __FILE__;
@@ -974,7 +977,7 @@ Upload the updated `frp-pro-template.php` to staging (`wp-content/mu-plugins/frp
 **Gated tier walkthrough (pro with `listing_tier = 'free'` or empty):**
 
 1. Navigate to a gated pro's profile URL on staging
-2. View page source — confirm phone number does NOT appear anywhere, including the `<script type="application/ld+json">` block in `<head>` (no `telephone` key)
+2. View page source — confirm phone number does NOT appear anywhere in the HTML, including the `<script type="application/ld+json">` block (no `telephone` key). Note: the JSON-LD block is in the `<body>`, not `<head>` — search the full page source for `telephone`.
 3. "Request Service" button is visible in sidebar
 4. Click → modal opens with 8 fields visible
 5. Submit with valid data → lead created; WP Admin → frp_lead post → Custom Fields panel (enable via Screen Options) → confirm `lead_contact_email`, `property_address`, `preferred_pro_id`, `lead_source = profile_form` are stored
@@ -991,6 +994,7 @@ Upload the updated `frp-pro-template.php` to staging (`wp-content/mu-plugins/frp
 4. "Call Now" button is an `<a>` anchor → clicking opens phone dialer (or follow the URL to confirm `/wp-json/frp/v1/call?...` is a valid endpoint)
 5. "Request Quote" button opens the modal
 6. On mobile → sticky "Call Now" bar visible at bottom
+7. View page source — confirm the `<script type="application/ld+json">` block **does** include `"telephone"` with the pro's phone number (the gated check should be false for a paid tier pro)
 
 - [ ] **Step 3: Commit**
 
@@ -1031,6 +1035,6 @@ Upload `wordpress-plugins/frp-pro-template.php` to `wp-content/mu-plugins/frp-pr
 - [ ] **Step 5: Final commit (mark implementation complete)**
 
 ```bash
-git add .
+git add wordpress-plugins/frp-directory.php wordpress-plugins/frp-pro-template.php tests/profile-form-lead.test.mjs
 git commit -m "chore: pro profile CTA implementation complete — backend + template deployed to live"
 ```
