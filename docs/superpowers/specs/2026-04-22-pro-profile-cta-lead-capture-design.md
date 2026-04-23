@@ -1,7 +1,7 @@
 # Pro Profile CTA & Lead Capture Design
 
 **Date:** 2026-04-22
-**Status:** Draft (third spec review pass in progress)
+**Status:** Approved
 
 ---
 
