@@ -1,7 +1,7 @@
 # Pro Profile CTA & Lead Capture Design
 
 **Date:** 2026-04-22
-**Status:** Draft (second spec review pass in progress)
+**Status:** Draft (third spec review pass in progress)
 
 ---
 
@@ -61,12 +61,22 @@ Three new fields added to the `frp_lead` post type and `/frp/v1/leads` endpoint:
 | Field | Meta key | Type | Required | Notes |
 |---|---|---|---|---|
 | Email | `lead_contact_email` | string | Yes when `source=profile_form` | Named `lead_contact_email` to avoid confusion with `contact_email` on `restoration_pro` posts (which stores the pro's billing email). Validated with `is_email()`. |
-| Street address | `property_address` | string | No | Sanitized text, complements ZIP |
-| Preferred pro | `preferred_pro_id` | integer | No | Stores pro post ID; signals direct assignment |
+| Street address | `property_address` | string | No | Sanitized text, complements ZIP. Note: `lead_address` is already registered in `frp_register_lead_meta()` but is never written by any current handler. `property_address` is a new, distinct key used exclusively by the profile form. Do not reuse `lead_address`. |
+| Preferred pro | `preferred_pro_id` | integer | **Yes** for `source=profile_form` | Stores pro post ID; signals direct assignment. Return 400 if absent or if `get_post_type($id) !== 'restoration_pro'`. |
 
 **Important — `contact_email` naming:** The `restoration_pro` post type already uses a `contact_email` meta key for the pro's billing/contact email. The lead meta key for the homeowner's email is deliberately named `lead_contact_email` to avoid confusion for future maintainers and Make.com webhook consumers.
 
 **`preferred_pro_id` behaviour:** When set, this field signals that the lead came from a specific pro's profile page. The Make.com webhook receives this value in the payload and handles direct notification to that pro — no matching algorithm is invoked. The existing matcher is bypassed for these leads.
+
+**Rate limiting for `profile_form`:** A homeowner may legitimately submit to several pros in one session (e.g., requesting quotes from 3 pros). `profile_form` submissions must use a **separate rate-limit bucket** (`lead_create_profile`) with a higher threshold: **10 submissions per 15 minutes per IP**. This is distinct from the existing `lead_create` bucket (3 per 15 min) used by all other sources. In the handler, before the existing rate-limit check for other sources, add:
+```php
+$bucket = ( $source === 'profile_form' ) ? 'lead_create_profile' : 'lead_create';
+$limit  = ( $source === 'profile_form' ) ? 10 : 3;
+if ( ! frp_check_rate_limit( $bucket, $limit, 15 * MINUTE_IN_SECONDS ) ) {
+    return new WP_Error( 'rate_limited', 'Too many requests. Please try again shortly.', [ 'status' => 429 ] );
+}
+```
+Remove (or skip) the existing unconditional `frp_check_rate_limit('lead_create', 3, ...)` call for `profile_form` submissions so both buckets are not charged simultaneously.
 
 **Duplicate detection for `profile_form`:** For `source=profile_form`, bypass the existing 24-hour phone/email duplicate detection entirely. Each pro-specific form submission is an independent intent signal — the same homeowner submitting to two different pros' profile pages must generate two separate `frp_lead` records.
 
@@ -90,8 +100,11 @@ if ( $zip && $source !== 'followup_modal' && $source !== 'profile_form' ) {
 }
 ```
 
-For `profile_form`, construct the dispatch result with the preferred pro's contact details (fetched from post meta) so that `frp_fire_lead_webhook()` can populate the `dispatched_pros` array in the Make.com payload (the webhook builder reads `name`, `dispatch_phone`, and `dispatch_email` from each pro in `$dispatch_result['pros']`):
+For `profile_form`, construct the dispatch result with the preferred pro's contact details (fetched from post meta) so that `frp_fire_lead_webhook()` can populate the `dispatched_pros` array in the Make.com payload (the webhook builder reads `name`, `dispatch_phone`, and `dispatch_email` from each pro in `$dispatch_result['pros']`).
+
+**Exact placement:** Insert the `profile_form` dispatch-result block *after* the step-10 meta-write block (line 1217) and *before* the `update_post_meta( $post_id, 'lead_assigned_pros', ...)` call at step 11 (line 1225):
 ```php
+// Between step-10 and step-11 of frp_lead_create_handler:
 if ( $source === 'profile_form' && $preferred_pro_id ) {
     $dispatch_result = [
         'has_coverage' => true,
@@ -106,7 +119,9 @@ if ( $source === 'profile_form' && $preferred_pro_id ) {
 }
 ```
 
-`lead_assigned_pros` is stored as `wp_json_encode([$preferred_pro_id])` — a JSON-encoded array containing the single integer — to remain consistent with all other consumers of that meta key (duplicate detection, admin display, Make.com webhook).
+**Step-10 `lead_assigned_pros` interaction:** The existing step-10 block (lines 1212–1214) writes `lead_assigned_pros` only when `$assigned_pro` (the `followup_modal` field) is nonzero. For `profile_form`, `$assigned_pro` will be 0 (the form does not send `assigned_pro`), so the step-10 block does not fire and there is no conflict. Step 11's `update_post_meta( $post_id, 'lead_assigned_pros', ... )` then writes `wp_json_encode( array_column( $dispatch_result['pros'], 'post_id' ) )` — which evaluates to `wp_json_encode([$preferred_pro_id])` — a JSON-encoded array of one integer, consistent with all other consumers.
+
+`lead_assigned_pros` is always stored as `wp_json_encode([...ids...])` — never a plain integer string.
 
 ---
 
@@ -132,7 +147,17 @@ if ( $email && ! is_email( $email ) ) {
 
 **Required change for `profile_form` only:** When `source=profile_form`, return HTTP 400 if `lead_contact_email` is missing or fails `is_email()` validation. For all other sources (`guided_flow`, `followup_modal`, `emergency_flow`), retain the existing silent-clear behaviour for backwards compatibility.
 
-**Validation order:** Phone validation runs first (existing line 1108 check). After phone passes, validate `lead_contact_email` specifically for `profile_form` — before the duplicate detection step. This keeps the existing validation ordering intact for all other sources.
+**Validation order and `$email` variable assignment:** Phone validation runs first (existing line 1108 check). Immediately after (still inside step 3 of the handler, before the duplicate check at step 5), add the following block to overwrite the `$email` variable for `profile_form`:
+```php
+// profile_form sends email under 'lead_contact_email' key; overwrite $email for downstream use
+if ( $source === 'profile_form' ) {
+    $email = sanitize_email( $request->get_param( 'lead_contact_email' ) ?? '' );
+    if ( ! $email || ! is_email( $email ) ) {
+        return new WP_Error( 'bad_request', 'A valid email address is required.', [ 'status' => 400 ] );
+    }
+}
+```
+This overwrites (not supplements) the `$email` variable initially set at line 1099 from `$request->get_param('email')`. After this block, `$email` holds the validated homeowner email for `profile_form` submissions. All downstream code (duplicate detection skip, `lead_email` meta write, webhook `$lead_data['email']`) operates on this same `$email` variable — no additional variable is needed.
 
 ---
 
@@ -183,7 +208,7 @@ Triggered by "Request Service" (gated) or "Request Quote" (accessible). Full-scr
 | Email | `lead_contact_email` | Yes | Validated server-side; 400 on invalid |
 | ZIP code | `zip` | Yes | Pre-filled from session if available |
 | Street address | `property_address` | No | |
-| Service type | `service` | Yes | Read from pro's `services` meta (comma-separated string, e.g. `"water-damage,mold-remediation"`). Pre-select if only one value; show dropdown of all values if multiple. If the `services` meta is empty or absent, show the full dropdown of all 7 values with a blank prompt as the first option. Valid values: `water-damage`, `mold-remediation`, `fire-damage`, `storm-damage`, `sewage-cleanup`, `structural`, `biohazard-cleanup` |
+| Service type | `service` | Yes | Read from pro's `services` meta (comma-separated string, e.g. `"water-damage,mold-remediation"`). **Single service:** render a read-only `<input type="text">` displaying the human-readable service label alongside a `<input type="hidden" name="service" value="[slug]">` — the user sees what they are requesting but cannot change it. **Multiple services:** show a `<select name="service">` dropdown listing all of the pro's service values. **Empty/absent `services` meta:** show a `<select name="service">` dropdown of all 7 valid values with a blank prompt (`<option value="">Select a service…</option>`) as the first option. Valid slugs: `water-damage`, `mold-remediation`, `fire-damage`, `storm-damage`, `sewage-cleanup`, `structural`, `biohazard-cleanup` |
 | Urgency | `urgency` | Yes | UI: "Right now" → POST: `now`; "Within 24 hours" → POST: `24hrs`; "Within a week" → POST: `older` |
 | Property type | `property_type` | Yes | UI: "Residential" → POST: `residential`; "Commercial" → POST: `commercial` |
 | Has insurance | `has_insurance` | Yes | UI: "Yes" → POST: `yes`; "No" → POST: `no`; "Not sure" → POST: `not-sure` |
@@ -205,7 +230,7 @@ Additional hidden fields sent with every submission:
     body: JSON.stringify(formData),
   });
   ```
-- On success (HTTP 200): modal closes, sidebar replaces CTA with: *"Request sent — [Pro Name] will be in touch soon."*
+- On success (HTTP 200): modal closes, JavaScript replaces the inner HTML of `<div id="frp-profile-cta-sidebar">` with: *"Request sent — [Pro Name] will be in touch soon."*
 - On error (HTTP 4xx/5xx): inline error message shown below the form, form stays open, submit button re-enabled. Display the server's `message` field from the JSON response body if present; otherwise fall back to: *"Something went wrong. Please try again."*
 
 **Token:** `window.FRP_LEAD_TOKEN` is injected into the page via the `wp_head` hook in `frp-directory.php`. The profile template calls `wp_head()`, so the token is available on profile pages without any additional wiring. Do not attempt to inject the token manually — it is already emitted globally.
@@ -238,13 +263,43 @@ Unchanged for all tiers — remains as the global entry point into the main guid
    - Accept `property_address`: sanitize with `sanitize_text_field()`, store on lead
    - Accept `preferred_pro_id`: cast to `absint()`, verify `get_post_type($id) === 'restoration_pro'`, store on lead meta. Return 400 if provided but invalid.
 
-4. **Extend `frp_fire_lead_webhook` payload** to include `preferred_pro_id` and `property_address` in the data array passed to Make.com. These are new fields not currently in the payload — this is a required code change, not already done.
+4. **Extend `frp_fire_lead_webhook` payload:** Add `preferred_pro_id` and `property_address` to the `$lead_data` array **at the call site** in `frp_lead_create_handler` (lines 1231–1241). Do not modify the function signature or body of `frp_fire_lead_webhook` itself — just extend the array passed in:
+   ```php
+   frp_fire_lead_webhook( $post_id, $score, $dispatch_result, [
+       'phone'            => $phone,
+       'email'            => $email,
+       'zip'              => $zip,
+       'service'          => $service,
+       'urgency'          => $urgency,
+       'property'         => $property,
+       'insurance'        => $insurance,
+       'source'           => $source,
+       'date'             => $now,
+       'preferred_pro_id' => $preferred_pro_id,  // new
+       'property_address' => $property_address,  // new
+   ] );
+   ```
+   Inside `frp_fire_lead_webhook`, add these two keys to the `$payload` array:
+   ```php
+   'preferred_pro_id' => $lead_data['preferred_pro_id'] ?? 0,
+   'property_address' => $lead_data['property_address'] ?? '',
+   ```
+   The Make.com webhook will receive them as `preferred_pro_id` (integer) and `property_address` (string) in the payload.
 
-5. **Update admin meta box label for `listing_tier`**: search `frp-directory.php` for the string `'Tier — free / featured / premium'` — it appears in the `$sections` array inside the meta box rendering callback. Change the label to `'Tier — free / basic / paid / featured / premium'` to reflect all five valid values.
+5. **Update admin meta box label for `listing_tier`**: in `frp-directory.php`, search for the string `'Tier — free / featured / premium'` (note: uses an em-dash U+2014, not a hyphen) — it appears in the `$sections` array inside the meta box rendering callback at approximately line 2161. Change the label to `'Tier — free / basic / paid / featured / premium'` to reflect all five valid values.
 
 ### `wordpress-plugins/frp-pro-template.php`
 
-**File status: new file to be created.** `frp-pro-template.php` does not currently exist in the repository. It serves as a WordPress page template (or mu-plugin rendering function) for individual `restoration_pro` profile pages. All pro profile template logic described in this spec goes into this new file.
+**File status: new file to be created.** `frp-pro-template.php` does not currently exist in the repository. Implement it as a **WordPress mu-plugin** (deployed alongside `frp-directory.php` in `wp-content/mu-plugins/`). It hooks into `template_include` to serve the profile template for `restoration_pro` single posts, following the same mu-plugin pattern as `frp-directory.php`. Example hook:
+```php
+add_filter( 'template_include', function( $template ) {
+    if ( is_singular( 'restoration_pro' ) ) {
+        return __DIR__ . '/frp-pro-template-view.php'; // separate view file for the HTML
+    }
+    return $template;
+} );
+```
+All pro profile template logic described in this spec goes into this new file (and its view file).
 
 1. **Read `listing_tier`** at template load: `$tier = get_post_meta($pro_id, 'listing_tier', true) ?: 'free';`
 
@@ -255,7 +310,7 @@ Unchanged for all tiers — remains as the global entry point into the main guid
 
 3. **Contact & Coverage sidebar — conditional rendering:**
    - If `!$is_accessible`: render "Request Service" button (opens modal), upsell note linking to `home_url('/pricing/')`, **no phone rendered**
-   - If `$is_accessible`: render phone number, "Call Now" button with href `/wp-json/frp/v1/call?company=[post_id]&source=profile&path=profile`, "Request Quote" button (opens modal)
+   - If `$is_accessible`: render phone number, "Call Now" `<a>` anchor with `href` generated via PHP as `esc_url( rest_url('frp/v1/call') ) . '?company=' . $pro_id . '&source=profile&path=profile'` — use `rest_url()`, not a hardcoded `/wp-json/` prefix; "Request Quote" button (opens modal)
 
 4. **Modal HTML:** Injected once at bottom of template, hidden by default (`display:none`). Contains the full 8-field form. JavaScript handles:
    - Open/close (triggered by both "Request Service" and "Request Quote" buttons)
@@ -291,7 +346,8 @@ Unchanged for all tiers — remains as the global entry point into the main guid
 - Missing email → server returns 400, form shows inline error, button re-enables
 - Invalid email format → server returns 400, form shows inline error
 - Submit with an invalid `preferred_pro_id` (non-existent post ID, or wrong post type) → server returns 400
-- Submit form with `property_address` populated → confirm value stored on `frp_lead` post meta and present in Make.com webhook payload
+- Submit form with `property_address` populated → confirm value stored on `frp_lead` post meta and present as `property_address` in Make.com webhook payload
+- In Make.com webhook log for a `profile_form` submission: confirm `preferred_pro_id` is present (integer), and `dispatched_pros` array contains exactly one entry with the pro's `business_name`, `phone`, and `contact_email`
 - Mobile: sticky "Request Service" bar opens modal
 - Upsell link present and resolves to pricing page URL
 
