@@ -244,3 +244,206 @@ get_header();
     </aside>
 
 </div><!-- .frp-profile-wrap -->
+
+<!-- ── JSON-LD schema (telephone only for accessible tier — never leak phone for gated pros) ── -->
+<script type="application/ld+json"><?php echo wp_json_encode( $schema ); ?></script>
+
+<!-- ── Mobile sticky bar ── -->
+<div id="frp-profile-sticky-bar">
+<?php if ( $is_accessible ) : ?>
+    <a href="<?php echo esc_url( $call_url ); ?>" class="frp-btn-primary">Call Now</a>
+<?php else : ?>
+    <button type="button" class="frp-btn-primary frp-open-modal">Request Service</button>
+<?php endif; ?>
+</div>
+
+<!-- ── Modal (shared by both "Request Service" and "Request Quote" triggers) ── -->
+<div id="frp-profile-modal" role="dialog" aria-modal="true" aria-labelledby="frp-modal-heading">
+    <div class="frp-modal-box">
+        <button type="button" class="frp-modal-close frp-close-modal" aria-label="Close">&times;</button>
+        <h2 class="frp-modal-title" id="frp-modal-heading">
+            <?php echo $is_accessible ? 'Request a Quote' : 'Request Service'; ?>
+        </h2>
+
+        <form id="frp-profile-form" novalidate>
+
+            <div class="frp-form-row">
+                <div class="frp-form-group">
+                    <label for="frp-phone">Phone *</label>
+                    <input type="tel" id="frp-phone" name="phone" required placeholder="(555) 555-5555">
+                </div>
+                <div class="frp-form-group">
+                    <label for="frp-email">Email *</label>
+                    <input type="email" id="frp-email" name="lead_contact_email" required placeholder="you@example.com">
+                </div>
+            </div>
+
+            <div class="frp-form-row">
+                <div class="frp-form-group">
+                    <label for="frp-zip">ZIP Code *</label>
+                    <input type="text" id="frp-zip" name="zip" required maxlength="5" placeholder="90210">
+                </div>
+                <div class="frp-form-group">
+                    <label for="frp-address">Street Address</label>
+                    <input type="text" id="frp-address" name="property_address" placeholder="123 Main St">
+                </div>
+            </div>
+
+            <div class="frp-form-group">
+                <label for="frp-service">Service Type *</label>
+                <?php
+                $svc_count = count( $services );
+                if ( $svc_count === 1 ) :
+                    $single_slug  = reset( $services );
+                    $single_label = $service_labels[ $single_slug ] ?? $single_slug;
+                ?>
+                    <!-- Single service: read-only display + hidden input -->
+                    <input type="text" value="<?php echo esc_attr( $single_label ); ?>" readonly>
+                    <input type="hidden" name="service" value="<?php echo esc_attr( $single_slug ); ?>">
+                <?php else : ?>
+                    <!-- Multiple services or empty: dropdown -->
+                    <select id="frp-service" name="service" required>
+                        <option value="">Select a service…</option>
+                        <?php
+                        $dropdown_slugs = $svc_count > 1 ? $services : $all_service_slugs;
+                        foreach ( $dropdown_slugs as $slug ) :
+                            $label = $service_labels[ $slug ] ?? $slug;
+                        ?>
+                            <option value="<?php echo esc_attr( $slug ); ?>"><?php echo esc_html( $label ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php endif; ?>
+            </div>
+
+            <div class="frp-form-group">
+                <label for="frp-urgency">Urgency *</label>
+                <select id="frp-urgency" name="urgency" required>
+                    <option value="">Select…</option>
+                    <option value="now">Right now</option>
+                    <option value="24hrs">Within 24 hours</option>
+                    <option value="older">Within a week</option>
+                </select>
+            </div>
+
+            <div class="frp-form-row">
+                <div class="frp-form-group">
+                    <label for="frp-property-type">Property Type *</label>
+                    <select id="frp-property-type" name="property_type" required>
+                        <option value="">Select…</option>
+                        <option value="residential">Residential</option>
+                        <option value="commercial">Commercial</option>
+                    </select>
+                </div>
+                <div class="frp-form-group">
+                    <label for="frp-insurance">Has Insurance? *</label>
+                    <select id="frp-insurance" name="has_insurance" required>
+                        <option value="">Select…</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                        <option value="not-sure">Not sure</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Hidden fields -->
+            <input type="hidden" name="source" value="profile_form">
+            <input type="hidden" name="preferred_pro_id" value="<?php echo esc_attr( $pro_id ); ?>">
+
+            <div class="frp-form-error" id="frp-form-error"></div>
+
+            <button type="submit" class="frp-btn-primary" id="frp-submit-btn" style="margin-top:.5rem;">
+                Send Request
+            </button>
+
+        </form>
+    </div>
+</div><!-- #frp-profile-modal -->
+
+<script>
+(function () {
+    'use strict';
+
+    // ── Sidebar confirmation message (injected on success) ──
+    var PRO_NAME = <?php echo wp_json_encode( $pro_name ); ?>;
+
+    // ── Modal open/close ──
+    var modal    = document.getElementById('frp-profile-modal');
+    var errorEl  = document.getElementById('frp-form-error');
+    var submitBtn = document.getElementById('frp-submit-btn');
+
+    function openModal() { modal.classList.add('is-open'); }
+    function closeModal() { modal.classList.remove('is-open'); }
+
+    // All elements that open the modal
+    document.querySelectorAll('.frp-open-modal').forEach(function (btn) {
+        btn.addEventListener('click', openModal);
+    });
+    // Close button and backdrop click
+    document.querySelectorAll('.frp-close-modal').forEach(function (btn) {
+        btn.addEventListener('click', closeModal);
+    });
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+    });
+
+    // ── Form submission ──
+    document.getElementById('frp-profile-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        // Disable button immediately (prevents double-submit)
+        submitBtn.disabled = true;
+        errorEl.classList.remove('is-visible');
+        errorEl.textContent = '';
+
+        // Collect form data as plain object
+        var fd = new FormData(e.target);
+        var body = {};
+        fd.forEach(function (val, key) { body[key] = val; });
+
+        fetch('/wp-json/frp/v1/leads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-FRP-Lead-Token': window.FRP_LEAD_TOKEN || '',
+            },
+            body: JSON.stringify(body),
+        })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+            });
+        })
+        .then(function (result) {
+            if (result.ok) {
+                // Success: close modal, replace sidebar CTA
+                closeModal();
+                var sidebar = document.getElementById('frp-profile-cta-sidebar');
+                if (sidebar) {
+                    sidebar.innerHTML =
+                        '<p class="frp-confirm-msg">Request sent — ' +
+                        PRO_NAME + ' will be in touch soon.</p>';
+                }
+            } else {
+                // Error: show server message or fallback
+                var msg = (result.data && result.data.message)
+                    ? result.data.message
+                    : 'Something went wrong. Please try again.';
+                errorEl.textContent = msg;
+                errorEl.classList.add('is-visible');
+                submitBtn.disabled = false;
+            }
+        })
+        .catch(function () {
+            errorEl.textContent = 'Something went wrong. Please try again.';
+            errorEl.classList.add('is-visible');
+            submitBtn.disabled = false;
+        });
+    });
+})();
+</script>
+
+<?php
+wp_footer();
+?>
+</body>
+</html>
