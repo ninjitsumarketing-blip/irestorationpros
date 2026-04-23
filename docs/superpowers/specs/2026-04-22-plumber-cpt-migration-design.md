@@ -46,41 +46,52 @@ A new mu-plugin `frp-plumbers.php` deployed to `wp-content/mu-plugins/` on both 
 | `has_archive` | `false` | No archive page |
 | `rewrite` | `false` | No permalink rules |
 | `supports` | `['title']` | Minimal — all data lives in post meta |
+| Capability (admin page) | `manage_options` | Both page registration and form submission |
 
 All existing post meta (`services`, `phone`, `listing_status`, `business_name`, etc.) is preserved untouched — only `post_type` changes.
 
+**Note on WP Admin sidebar:** Because `rewrite = false`, no permalink flush is needed. However, after uploading the plugin for the first time, the "Plumbers" sidebar item may require a page reload or a visit to Settings → Permalinks before it appears. This is a normal WordPress CPT registration behaviour.
+
 **2. WP Admin Migration Page**
 
-- Location: **Tools → Migrate to Plumbers**
-- Capability required: `manage_options`
-- Nonce-protected form
+- Location: **Tools → Migrate to Plumbers** (registered via `add_management_page`, capability `manage_options`)
+- Nonce-protected form (action: `frp_migrate_to_plumbers`)
 
-**Dry-run preview (always shown):**
+**Dry-run preview (always shown, before and after migration):**
 - Count of `restoration_pro` posts matching `services = 'sewage-cleanup'` (exact, not LIKE)
-- Table: Post ID | Business Name | Status
+- Table columns: **Post ID** | **Business Name** (post title) | **Post Status** (`post_status` field: publish / draft / pending / private / trash (excluded by query))
 - "Run Migration" submit button
 
-**Post-run state:**
-- Success notice: "X profiles migrated to Plumbers."
-- If 0 matches: "Nothing to migrate — no sewage-cleanup-only restoration pros found."
-- Idempotent: safe to run multiple times
+**Post-run notice:**
+- `"X profiles migrated to Plumbers. Y failed (see error log)."` — always shows both counts
+- If 0 matches and 0 failures: `"Nothing to migrate — no sewage-cleanup-only restoration pros found."`
+- Idempotent: safe to run multiple times (already-migrated posts have `post_type = plumber` and are not found by the query)
 
 **3. Migration Logic**
 
 ```
 WP_Query:
-  post_type    = restoration_pro
-  post_status  = any
+  post_type     = restoration_pro
+  post_status   = ['publish', 'draft', 'pending', 'private']   ← excludes trash (see note)
   meta_query:
     key     = services
     value   = sewage-cleanup
-    compare = =          ← exact match only
+    compare = =          ← exact string match on the raw meta value
   no_found_rows = true
   posts_per_page = -1
 
 For each result:
-  wp_update_post(['ID' => $id, 'post_type' => 'plumber'])
+  $result = wp_update_post(['ID' => $id, 'post_type' => 'plumber'])
+  if $result === 0 or is_wp_error($result):
+    $failed[]  = $id
+    error_log("frp-plumbers: failed to migrate post $id")
+  else:
+    $migrated[] = $id
 ```
+
+**Why `compare = =` is correct:** WordPress translates this to a SQL `=` comparison against the full raw meta value string. `services = 'sewage-cleanup'` will NOT match `'sewage-cleanup,water-damage'` or `'water-damage,sewage-cleanup'` because those are different strings. `LIKE` must not be used — it would match partial substrings and pull in multi-service pros.
+
+**Why trash is excluded:** Trashed posts are already hidden from all public-facing queries. Migrating them provides no benefit and could confuse admin users who see migrated content in the Plumbers trash. If needed, a separate manual step can handle trashed posts.
 
 `wp_update_post` with only `post_type` changed preserves all meta, title, content, status, and dates.
 
@@ -92,8 +103,13 @@ For each result:
 WP Admin clicks "Run Migration"
   → nonce verified
   → WP_Query finds restoration_pro posts where services = 'sewage-cleanup' exactly
-  → foreach: wp_update_post sets post_type = 'plumber'
-  → success notice with count
+     (excludes trash)
+  → foreach post:
+      wp_update_post(['post_type' => 'plumber'])
+      → success: add to migrated count
+      → failure: add to failed count, log post ID to error_log
+  → admin notice: "X migrated. Y failed."
+  → page re-renders dry-run preview (should now show 0 remaining)
   → next directory search automatically excludes moved posts (queries restoration_pro only)
 ```
 
@@ -114,19 +130,22 @@ $query->set('post_type', 'restoration_pro');
 ## Deployment Order
 
 1. Upload `frp-plumbers.php` to staging `wp-content/mu-plugins/`
-2. Verify dry-run count on staging looks correct
-3. Run migration on staging — confirm plumber posts appear in WP Admin → Plumbers and disappear from Restoration Pros directory search
-4. Upload to live `wp-content/mu-plugins/`
-5. Run migration on live
+2. Visit WP Admin (a page reload may be needed for the "Plumbers" sidebar item to appear)
+3. Open Tools → Migrate to Plumbers — verify dry-run count looks correct
+4. Run migration on staging — confirm success notice shows expected count and 0 failures
+5. Verify: WP Admin → Plumbers shows migrated posts; WP Admin → Restoration Pros no longer shows them
+6. Upload `frp-plumbers.php` to live `wp-content/mu-plugins/`
+7. Run migration on live
 
 ---
 
 ## Verification (Manual)
 
-- WP Admin → Plumbers: shows migrated posts with all meta intact
+- WP Admin → Plumbers: shows migrated posts with all meta intact (same post IDs)
 - WP Admin → Restoration Pros: sewage-cleanup-only profiles no longer listed
 - Frontend zip/service search: no sewage-cleanup-only profiles in results
 - Multi-service pros (e.g., `"water-damage,sewage-cleanup"`): unaffected, still in Restoration Pros
+- Trashed sewage-cleanup-only restoration_pro posts: remain in trash, not migrated
 
 ---
 
