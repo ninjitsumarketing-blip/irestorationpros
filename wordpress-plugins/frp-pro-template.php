@@ -59,8 +59,8 @@ $service_labels = [
 ];
 $all_service_slugs = array_keys( $service_labels );
 
-// Call Now URL — use rest_url() not hardcoded /wp-json/
-$call_url = esc_url( rest_url( 'frp/v1/call' ) ) . '?company=' . $pro_id . '&source=profile&path=profile';
+// Call Now URL — use rest_url() not hardcoded /wp-json/; escape only at output
+$call_url = rest_url( 'frp/v1/call' ) . '?company=' . $pro_id . '&source=profile&path=profile';
 
 // JSON-LD schema — telephone only when accessible (spec: phone never in HTML for gated pros)
 $schema = [
