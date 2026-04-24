@@ -1106,6 +1106,9 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     // New params for profile_form
     $preferred_pro_id = absint( $request->get_param( 'preferred_pro_id' ) ?? 0 );
     $property_address = sanitize_text_field( $request->get_param( 'property_address' ) ?? '' );
+    if ( strlen( $property_address ) > 200 ) {
+        $property_address = substr( $property_address, 0, 200 ); // silently truncate overlong input
+    }
 
     // Phone is required (except followup_modal can supply email instead)
     if ( ! $phone || ! preg_match( '/^\+?[\d\s\-().]{7,20}$/', $phone ) ) {

@@ -6,6 +6,10 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Remove the legacy redirect that sent restoration_pro singular requests to /profile/?slug=.
+// This template now handles those URLs directly via template_include — no redirect needed.
+remove_action( 'template_redirect', 'frp_redirect_cpt_permalink' );
+
 // Register this file as the template for restoration_pro single posts.
 // The file acts as both plugin (registers the filter) and template (renders the page).
 // __FILE__ (not a separate view file) keeps deployment to a single file upload via SiteGround
@@ -285,7 +289,7 @@ get_header();
                 </div>
                 <div class="frp-form-group">
                     <label for="frp-address">Street Address</label>
-                    <input type="text" id="frp-address" name="property_address" placeholder="123 Main St">
+                    <input type="text" id="frp-address" name="property_address" maxlength="200" placeholder="123 Main St">
                 </div>
             </div>
 
@@ -349,7 +353,7 @@ get_header();
             <input type="hidden" name="source" value="profile_form">
             <input type="hidden" name="preferred_pro_id" value="<?php echo esc_attr( $pro_id ); ?>">
 
-            <div class="frp-form-error" id="frp-form-error"></div>
+            <div class="frp-form-error" id="frp-form-error" role="alert" aria-live="polite"></div>
 
             <button type="submit" class="frp-btn-primary" id="frp-submit-btn" style="margin-top:.5rem;">
                 Send Request
@@ -364,7 +368,8 @@ get_header();
     'use strict';
 
     // ── Sidebar confirmation message (injected on success) ──
-    var PRO_NAME = <?php echo wp_json_encode( $pro_name, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT ); ?>;
+    var PRO_NAME   = <?php echo wp_json_encode( $pro_name, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT ); ?>;
+    var LEADS_URL  = <?php echo wp_json_encode( rest_url( 'frp/v1/leads' ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT ); ?>;
 
     // ── Modal open/close ──
     var modal    = document.getElementById('frp-profile-modal');
@@ -400,7 +405,7 @@ get_header();
         var body = {};
         fd.forEach(function (val, key) { body[key] = val; });
 
-        fetch('/wp-json/frp/v1/leads', {
+        fetch(LEADS_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
