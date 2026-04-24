@@ -1295,6 +1295,8 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     ] );
     update_post_meta( $post_id, 'lead_make_sent', 1 );
 
+    do_action( 'frp_lead_created', $post_id );
+
     return rest_ensure_response( [
         'success'           => true,
         'lead_id'           => $post_id,
