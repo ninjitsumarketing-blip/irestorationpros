@@ -142,6 +142,9 @@ export async function createTestLead(opts = {}) {
     await frpPost('/wp-json/frp/v1/admin/set-post-meta',
       { post_id: body.lead_id, meta: { lead_update_token_expiry: expired } }, { auth: true });
   }
+  if (opts.assignTo) {
+    await setPostMeta(body.lead_id, 'lead_assigned_pros', JSON.stringify([opts.assignTo]));
+  }
   return { lead_id: body.lead_id, token: body.lead_update_token };
 }
 
@@ -156,6 +159,11 @@ export async function resetTestLeads() {
       frpPost('/wp-json/frp/v1/admin/delete-post', { post_id: p.id }, { auth: true })
     ));
   }
+}
+
+// Assign a lead to a pro by setting lead_assigned_pros meta to JSON.stringify([proId]).
+export async function assignLeadToPro(leadId, proId) {
+  await setPostMeta(leadId, 'lead_assigned_pros', JSON.stringify([proId]));
 }
 
 /**
