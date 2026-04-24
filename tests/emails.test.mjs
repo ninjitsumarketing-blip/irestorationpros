@@ -36,7 +36,7 @@ test('frp_application_submitted fires without error (POST /apply smoke test)', a
   const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
     business_name:  'Email Test Co',
     contact_email:  `emailtest${Date.now()}@example.com`,
-    phone:          `555${Date.now().toString().slice(-7)}`,
+    dispatch_phone: `555${Date.now().toString().slice(-7)}`,
     services:       'water-damage',
     zip:            '90210',
     state:          'CA',

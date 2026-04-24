@@ -61,6 +61,10 @@ function frp_claim_email_body( string $business, string $applicant_email, string
  * @return string Rendered HTML.
  */
 function frp_email_tpl( string $name, array $vars = [], array $url_vars = [] ) : string {
+    // Guard against path traversal — name must be lowercase alphanumeric + hyphens only.
+    if ( ! preg_match( '/^[a-z0-9\-]+$/', $name ) ) {
+        return '';
+    }
     $path = __DIR__ . '/templates/emails/' . $name . '.html';
     $html = file_exists( $path ) ? file_get_contents( $path ) : '<p>{{body}}</p>';
     foreach ( $vars as $k => $v ) {
@@ -149,6 +153,8 @@ function frp_email_sub_activated( int $pro_id, string $tier ) : void {
         frp_email_tpl( 'subscription-active', [
             'pro_id' => $pro_id,
             'tier'   => $tier,
+        ], [
+            'dashboard_url' => home_url( '/contractor/dashboard/' ),
         ] ),
         [ 'Content-Type: text/html; charset=UTF-8' ]
     );
