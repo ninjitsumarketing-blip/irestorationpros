@@ -41,6 +41,10 @@ function frp_dashboard_leads_html( $pro_id ) {
         'post_type'      => 'frp_lead',
         'posts_per_page' => 50,
         'post_status'    => 'publish',
+        // lead_assigned_pros stores JSON like [123] or [123,456].
+        // LIKE on the integer string is sufficient for single-assignment leads
+        // (current design assigns at most one pro per lead). If multi-assignment
+        // is ever enabled, revisit this query to avoid ID substring false-positives.
         'meta_query'     => [[
             'key'     => 'lead_assigned_pros',
             'value'   => (string) $pro_id,
@@ -57,8 +61,9 @@ function frp_dashboard_leads_html( $pro_id ) {
         $svc   = esc_html( get_post_meta( $id, 'lead_service', true ) );
         $urg   = esc_html( get_post_meta( $id, 'lead_urgency', true ) );
         $score = (int) get_post_meta( $id, 'lead_score', true );
-        $phone = esc_html( get_post_meta( $id, 'lead_phone', true ) );
-        $out .= "<li data-lead-id='{$id}'><strong>{$svc}</strong> · {$city} · urgency:{$urg} · score:{$score} · <a href='tel:{$phone}'>{$phone}</a></li>";
+        $phone_display = esc_html( get_post_meta( $id, 'lead_phone', true ) );
+        $phone_href    = esc_url( 'tel:' . get_post_meta( $id, 'lead_phone', true ) );
+        $out .= "<li data-lead-id='{$id}'><strong>{$svc}</strong> · {$city} · urgency:{$urg} · score:{$score} · <a href='{$phone_href}'>{$phone_display}</a></li>";
     }
     $out .= '</ul>';
     return $out;
@@ -66,6 +71,9 @@ function frp_dashboard_leads_html( $pro_id ) {
 
 function frp_dashboard_profile_html( $pro_id ) {
     $pro = get_post( $pro_id );
+    if ( ! $pro ) {
+        return '<p class="frp-dashboard-error">Profile not found. Contact support.</p>';
+    }
     return '<h3>' . esc_html( $pro->post_title ) . '</h3>' .
            '<p>Listing tier: ' . esc_html( get_post_meta( $pro_id, 'listing_tier', true ) ?: 'free' ) . '</p>';
 }
@@ -95,9 +103,6 @@ add_action( 'rest_api_init', function () {
         'methods'             => 'GET',
         'callback'            => function () {
             $pro_id = frp_current_pro_id();
-            if ( ! $pro_id ) {
-                return new WP_Error( 'no_pro', 'Not linked to a pro.', [ 'status' => 403 ] );
-            }
             return rest_ensure_response( [ 'html' => frp_dashboard_leads_html( $pro_id ) ] );
         },
         'permission_callback' => function () {

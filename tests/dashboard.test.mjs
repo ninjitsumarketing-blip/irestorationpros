@@ -28,11 +28,11 @@ test('logged-in pro sees their leads, not others', async () => {
 
   const html = body.html ?? '';
   assert.ok(
-    html.includes(`data-lead-id='${myLead.lead_id}'`),
+    new RegExp(`data-lead-id=['"]${myLead.lead_id}['"]`).test(html),
     `Expected pro's own lead (${myLead.lead_id}) in HTML`
   );
   assert.ok(
-    !html.includes(`data-lead-id='${otherLead.lead_id}'`),
+    !new RegExp(`data-lead-id=['"]${otherLead.lead_id}['"]`).test(html),
     `Did not expect other pro's lead (${otherLead.lead_id}) in HTML`
   );
 });
