@@ -60,11 +60,14 @@ function frp_claim_email_body( string $business, string $applicant_email, string
  * @param array  $vars  Key-value pairs for placeholder replacement.
  * @return string Rendered HTML.
  */
-function frp_email_tpl( string $name, array $vars = [] ) : string {
+function frp_email_tpl( string $name, array $vars = [], array $url_vars = [] ) : string {
     $path = __DIR__ . '/templates/emails/' . $name . '.html';
     $html = file_exists( $path ) ? file_get_contents( $path ) : '<p>{{body}}</p>';
     foreach ( $vars as $k => $v ) {
         $html = str_replace( '{{' . $k . '}}', esc_html( (string) $v ), $html );
+    }
+    foreach ( $url_vars as $k => $v ) {
+        $html = str_replace( '{{' . $k . '}}', esc_url( (string) $v ), $html );
     }
     return $html;
 }
@@ -97,6 +100,7 @@ function frp_email_application( int $pro_id ) : void {
         frp_email_tpl( 'application-admin', [
             'pro_id'   => $pro_id,
             'business' => $pro->post_title,
+        ], [
             'edit_url' => admin_url( 'post.php?post=' . $pro_id . '&action=edit' ),
         ] ),
         [ 'Content-Type: text/html; charset=UTF-8' ]
@@ -115,15 +119,15 @@ function frp_email_lead_created( int $lead_id ) : void {
     $email = (string) get_post_meta( $lead_id, 'lead_email', true );
     if ( ! $email || ! is_email( $email ) ) return;
 
-    $token      = (string) get_post_meta( $lead_id, 'lead_update_token', true );
-    $cancel_url = home_url( '/lead-status/?id=' . $lead_id . '&token=' . rawurlencode( $token ) );
+    $token = (string) get_post_meta( $lead_id, 'lead_update_token', true );
 
     wp_mail(
         $email,
         'Your restoration request — Find Restoration Pros',
         frp_email_tpl( 'lead-homeowner', [
-            'lead_id'    => $lead_id,
-            'cancel_url' => $cancel_url,
+            'lead_id' => $lead_id,
+        ], [
+            'cancel_url' => home_url( '/lead-status/?id=' . $lead_id . '&token=' . rawurlencode( $token ) ),
         ] ),
         [ 'Content-Type: text/html; charset=UTF-8' ]
     );

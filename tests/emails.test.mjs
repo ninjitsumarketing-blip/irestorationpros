@@ -18,7 +18,7 @@ import { seedPro, resetTestPros, resetTestLeads } from './helpers/staging.mjs';
  * Runbook: docs/runbooks/email-testing.md
  */
 
-const MAIL_CAPTURE = !!process.env.FRP_MAIL_CAPTURE_URL;
+const MAIL_CAPTURE = !!process.env.FRP_MAIL_CAPTURE;
 
 test.before(async () => {
   await resetTestLeads();
