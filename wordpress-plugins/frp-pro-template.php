@@ -246,7 +246,7 @@ get_header();
 </div><!-- .frp-profile-wrap -->
 
 <!-- ── JSON-LD schema (telephone only for accessible tier — never leak phone for gated pros) ── -->
-<script type="application/ld+json"><?php echo wp_json_encode( $schema ); ?></script>
+<script type="application/ld+json"><?php echo wp_json_encode( $schema, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT ); ?></script>
 
 <!-- ── Mobile sticky bar ── -->
 <div id="frp-profile-sticky-bar">
@@ -281,7 +281,7 @@ get_header();
             <div class="frp-form-row">
                 <div class="frp-form-group">
                     <label for="frp-zip">ZIP Code *</label>
-                    <input type="text" id="frp-zip" name="zip" required maxlength="5" placeholder="90210">
+                    <input type="text" id="frp-zip" name="zip" required maxlength="5" pattern="[0-9]{5}" inputmode="numeric" placeholder="90210">
                 </div>
                 <div class="frp-form-group">
                     <label for="frp-address">Street Address</label>
@@ -298,7 +298,7 @@ get_header();
                     $single_label = $service_labels[ $single_slug ] ?? $single_slug;
                 ?>
                     <!-- Single service: read-only display + hidden input -->
-                    <input type="text" value="<?php echo esc_attr( $single_label ); ?>" readonly>
+                    <input type="text" id="frp-service" value="<?php echo esc_attr( $single_label ); ?>" readonly>
                     <input type="hidden" name="service" value="<?php echo esc_attr( $single_slug ); ?>">
                 <?php else : ?>
                     <!-- Multiple services or empty: dropdown -->
@@ -364,7 +364,7 @@ get_header();
     'use strict';
 
     // ── Sidebar confirmation message (injected on success) ──
-    var PRO_NAME = <?php echo wp_json_encode( $pro_name ); ?>;
+    var PRO_NAME = <?php echo wp_json_encode( $pro_name, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT ); ?>;
 
     // ── Modal open/close ──
     var modal    = document.getElementById('frp-profile-modal');
@@ -415,14 +415,17 @@ get_header();
         })
         .then(function (result) {
             if (result.ok) {
-                // Success: close modal, replace sidebar CTA
+                // Success: close modal, reset form, replace sidebar CTA, hide sticky bar trigger
                 closeModal();
+                e.target.reset();
                 var sidebar = document.getElementById('frp-profile-cta-sidebar');
                 if (sidebar) {
                     sidebar.innerHTML =
                         '<p class="frp-confirm-msg">Request sent — ' +
                         PRO_NAME + ' will be in touch soon.</p>';
                 }
+                var stickyBtn = document.querySelector('#frp-profile-sticky-bar .frp-open-modal');
+                if (stickyBtn) { stickyBtn.style.display = 'none'; }
             } else {
                 // Error: show server message or fallback
                 var msg = (result.data && result.data.message)
