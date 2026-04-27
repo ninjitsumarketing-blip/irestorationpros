@@ -115,6 +115,8 @@ The `/apply` endpoint in `frp-directory.php` uses a three-function chain: `frp_a
 
 **Step 1 — Add to `frp_apply_validate()` return array:**
 
+The function currently returns `compact('business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services')` — note: `business` (not `business_name`), `contact` (not `contact_name`).
+
 ```php
 $iicrc = sanitize_text_field( (string) ( $r->get_param( 'iicrc_certified' ) ?? '' ) );
 // Allowed values: 'yes', 'no', 'in_progress'. Silently ignore anything else.
@@ -123,7 +125,7 @@ if ( ! in_array( $iicrc, [ 'yes', 'no', 'in_progress' ], true ) ) {
 }
 ```
 
-Add `'iicrc' => $iicrc` to the array returned by `frp_apply_validate()`.
+Add `'iicrc' => $iicrc` to the array returned by `frp_apply_validate()` — either by adding it to the `compact()` call after setting `$iicrc`, or appending it to the returned array.
 
 **Step 2 — Store in `frp_apply_insert_new()`:**
 
@@ -135,13 +137,15 @@ Add this line alongside the other `update_post_meta` calls in `frp_apply_insert_
 
 **Step 3 — Update existing pro in `frp_apply_initiate_claim()`:**
 
+`$pro_id` is resolved on the first line of this function as `$pro_id = $match['pro_id']` (note: the key is `pro_id`, not `id`).
+
 ```php
 if ( $applicant['iicrc'] !== '' ) {
     update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
 }
 ```
 
-Add this inside `frp_apply_initiate_claim()` after `$pro_id` is resolved. Only write if non-empty — do not overwrite an existing value with blank.
+Add this immediately after `$pro_id = $match['pro_id'];`. Only write if non-empty — do not overwrite an existing value with blank.
 
 **No validation required** — field is optional. Missing or invalid values are silently cleared.
 
@@ -161,17 +165,41 @@ Three targeted changes to `wordpress-plugins/frp-pro-template.php`. No structura
 
 ### Change 1: Badge Display Gate (`claim_status` check)
 
-**Current behavior:** Credential badges (IICRC, Licensed, Insured) are displayed based on whether the pro has those meta fields set, with no check on claim status.
-
-**New behavior:** Badges only render when `claim_status` meta equals `'claimed'`. Pros with `claim_status` of `unclaimed`, `claim_pending`, `disputed`, or empty string show no credential badges.
+**Current state:** The current template (`frp-pro-template.php`) contains NO credential badge rendering — there is no IICRC badge, no Licensed badge, no Insured badge. These blocks need to be **created**, not modified.
 
 **Implementation:**
+
+Add two new PHP variables near the top of the data section (after `$bio`):
+
 ```php
-$claim_status = (string) get_post_meta( $pro_id, 'claim_status', true );
-$is_claimed   = ( $claim_status === 'claimed' );
+$claim_status  = (string) get_post_meta( $pro_id, 'claim_status', true );
+$is_claimed    = ( $claim_status === 'claimed' );
+$iicrc_status  = (string) get_post_meta( $pro_id, 'iicrc_certified', true );
+$certifications = (string) get_post_meta( $pro_id, 'certifications', true );
+$years_in_biz  = (int) get_post_meta( $pro_id, 'years_in_business', true );
 ```
 
-All badge rendering blocks are wrapped in `if ( $is_claimed ) { ... }`.
+Add badge rendering in the main content column (after the `$bio` paragraph, before the sidebar), guarded by `$is_claimed`:
+
+```php
+<?php if ( $is_claimed ) : ?>
+    <div class="frp-credential-badges">
+        <?php if ( $iicrc_status === 'yes' ) : ?>
+            <span class="frp-badge frp-badge--iicrc">✓ IICRC Certified</span>
+        <?php endif; ?>
+        <?php if ( $certifications ) : ?>
+            <?php foreach ( array_filter( array_map( 'trim', explode( ',', $certifications ) ) ) as $cert ) : ?>
+                <span class="frp-badge"><?php echo esc_html( $cert ); ?></span>
+            <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ( $years_in_biz > 0 ) : ?>
+            <span class="frp-badge"><?php echo esc_html( $years_in_biz ); ?> yrs in business</span>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+```
+
+Add minimal CSS for `.frp-credential-badges` and `.frp-badge` in the `<style>` block — inline pill style, similar to the existing `.frp-meta-row` color palette.
 
 The tier-gating for phone/CTAs is unchanged — it remains based on `listing_tier` only.
 
@@ -179,17 +207,17 @@ The tier-gating for phone/CTAs is unchanged — it remains based on `listing_tie
 
 ### Change 2: Copy Polish
 
-Remove hardcoded elevated placeholder copy. The profile page currently reads `get_post_meta( $pro_id, 'bio', true )` and stores it in `$bio` (line 47 of `frp-pro-template.php`). This is the display field for the business description. Where placeholder text currently exists (e.g., "Certified specialists in structural recovery and environmental remediation. We serve the greater metropolitan area with 24/7 emergency response protocols and a commitment to architectural integrity."), replace with a conditional on `$bio`:
+**No code change required for the current template.** The current `frp-pro-template.php` already implements the correct conditional at lines 211–213:
 
-- If `$bio` is set and non-empty: render it
-- If empty: render nothing (no placeholder copy)
+```php
+<?php if ( $bio ) : ?>
+    <p><?php echo esc_html( $bio ); ?></p>
+<?php endif; ?>
+```
 
-Section headings that use elevated language:
-- "Core Expertise" → keep as-is (functional, not editorial)
-- "Portfolio of Recovery" → keep as-is (acceptable)
-- "Client Perspectives" → keep as-is (acceptable)
+There is no hardcoded placeholder copy (no "architectural integrity", "resilient monolith", or similar) and no "Core Expertise" / "Portfolio of Recovery" / "Client Perspectives" section headings in the current template.
 
-Remove any hardcoded copy that references "architectural integrity", "resilient monolith", or similar editorial voice not tied to the pro's actual data.
+**Verification step only:** Confirm this conditional is present. If a future version of the template re-introduces placeholder copy, this spec defines the correct behavior: render `$bio` if set and non-empty; render nothing if empty.
 
 ---
 
@@ -204,6 +232,15 @@ Remove any hardcoded copy that references "architectural integrity", "resilient 
 This applies only to:
 - The sidebar upsell note (`<p class="frp-upsell-note">`) — visible below the "Request Service" button in `#frp-profile-cta-sidebar` for free/basic tier pros
 
+Replace lines 241–244 with:
+
+```php
+<p class="frp-upsell-note">
+    Want homeowners to call you directly? Upgrade your listing to show your phone number and receive leads straight to you.
+    <a href="<?php echo esc_url( home_url( '/pricing/' ) ); ?>">See what's included →</a>
+</p>
+```
+
 The mobile sticky bar (`#frp-profile-sticky-bar`) currently contains only a button — no upsell text. No change needed there.
 
 ---
@@ -217,8 +254,6 @@ Both pages use the same badge/tier logic defined in `2026-04-26-homepage-redesig
 | `unclaimed` / `claim_pending` / `disputed` / empty | any | None |
 | `claimed` | `free` / `basic` | Self-reported credentials |
 | `claimed` | `paid` / `featured` / `premium` | Self-reported credentials + "Featured" label |
-
----
 
 ---
 
