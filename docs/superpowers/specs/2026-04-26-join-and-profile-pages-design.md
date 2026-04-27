@@ -62,7 +62,7 @@ The form submits to `POST /wp-json/frp/v1/apply`. All fields match endpoint para
 | Email | `contact_email` | email | Yes | |
 | State | `state` | select | Yes | All 50 US states + DC |
 | Services | `services` | checkboxes | No | water-damage, fire-damage, mold-remediation, storm-damage, sewage-cleanup, structural, biohazard-cleanup. Submit as JSON array: `"services": ["water-damage", ...]`. Endpoint reads `get_param('services')` — no bracket notation in the request body. |
-| IICRC Certified? | `iicrc_certified` | radio | No | Options: Yes / No / In Progress. Helper text: *"IICRC certification is displayed on your profile as a badge and improves credibility with homeowners."* |
+| IICRC Certified? | `iicrc_certified` | radio | No | Options: Yes (`value="yes"`) / No (`value="no"`) / In Progress (`value="in_progress"`). Use these exact values — the server validator accepts only `yes`, `no`, `in_progress` (lowercase with underscores) and silently clears anything else. Helper text: *"IICRC certification is displayed on your profile as a badge and improves credibility with homeowners."* |
 | License Number | `license_number` | text | No | |
 | Years in Business | `years_in_business` | number | No | `absint` server-side |
 | Service Area ZIP codes | `service_area_zips` | text | No | Comma-separated. Stored in CPT meta as `zip_codes` (existing backend mapping — no change needed). |
@@ -149,15 +149,18 @@ update_post_meta( $pro_id, 'phone', $a['phone'] );
 
 `$pro_id` is resolved as `$pro_id = $match['pro_id']` (note: `pro_id`, not `id`). However, the function has an early-return path (no on-file email → routes to manual review) immediately after `$pro_id` resolution. Do **not** place the write before that guard — data should only be written when the claim proceeds normally.
 
-Place the write among the other `update_post_meta` calls (after line 1702, starting around line 1709):
+Place both writes among the other `update_post_meta` calls (after line 1702, starting around line 1709):
 
 ```php
 if ( $applicant['iicrc'] !== '' ) {
     update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
 }
+if ( $applicant['phone'] !== '' ) {
+    update_post_meta( $pro_id, 'phone', $applicant['phone'] );
+}
 ```
 
-Only write if non-empty — do not overwrite an existing value with blank.
+Only write if non-empty — do not overwrite an existing value with blank. The `phone` write is needed for the same reason as in `frp_apply_insert_new()`: the profile template reads the `phone` meta key, not `dispatch_phone`.
 
 **No validation required** — field is optional. Missing or invalid values are silently cleared.
 
