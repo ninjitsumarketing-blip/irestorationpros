@@ -117,6 +117,8 @@ The `/apply` endpoint in `frp-directory.php` uses a three-function chain: `frp_a
 
 The function currently returns `compact('business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services')` — note: `business` (not `business_name`), `contact` (not `contact_name`).
 
+Insert the `$iicrc` assignment among the existing variable assignments (lines 1582–1591, before the validation checks):
+
 ```php
 $iicrc = sanitize_text_field( (string) ( $r->get_param( 'iicrc_certified' ) ?? '' ) );
 // Allowed values: 'yes', 'no', 'in_progress'. Silently ignore anything else.
@@ -125,7 +127,7 @@ if ( ! in_array( $iicrc, [ 'yes', 'no', 'in_progress' ], true ) ) {
 }
 ```
 
-Add `'iicrc' => $iicrc` to the array returned by `frp_apply_validate()` — either by adding it to the `compact()` call after setting `$iicrc`, or appending it to the returned array.
+Then add `iicrc` to the `compact()` call: `return compact('business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services', 'iicrc')`.
 
 **Step 2 — Store in `frp_apply_insert_new()`:**
 
@@ -137,7 +139,9 @@ Add this line alongside the other `update_post_meta` calls in `frp_apply_insert_
 
 **Step 3 — Update existing pro in `frp_apply_initiate_claim()`:**
 
-`$pro_id` is resolved on the first line of this function as `$pro_id = $match['pro_id']` (note: the key is `pro_id`, not `id`).
+`$pro_id` is resolved as `$pro_id = $match['pro_id']` (note: `pro_id`, not `id`). However, the function has an early-return path (no on-file email → routes to manual review) immediately after `$pro_id` resolution. Do **not** place the write before that guard — data should only be written when the claim proceeds normally.
+
+Place the write among the other `update_post_meta` calls (after line 1702, starting around line 1709):
 
 ```php
 if ( $applicant['iicrc'] !== '' ) {
@@ -145,7 +149,7 @@ if ( $applicant['iicrc'] !== '' ) {
 }
 ```
 
-Add this immediately after `$pro_id = $match['pro_id'];`. Only write if non-empty — do not overwrite an existing value with blank.
+Only write if non-empty — do not overwrite an existing value with blank.
 
 **No validation required** — field is optional. Missing or invalid values are silently cleared.
 
@@ -199,7 +203,24 @@ Add badge rendering in the main content column (after the `$bio` paragraph, befo
 <?php endif; ?>
 ```
 
-Add minimal CSS for `.frp-credential-badges` and `.frp-badge` in the `<style>` block — inline pill style, similar to the existing `.frp-meta-row` color palette.
+Add minimal CSS for `.frp-credential-badges` and `.frp-badge` in the `<style>` block — inline pill style, similar to the existing `.frp-meta-row` color palette. Example:
+
+```css
+.frp-credential-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin: .75rem 0; }
+.frp-badge { display: inline-block; padding: .2rem .6rem; background: #f1f5f9; border-radius: 999px; font-size: .8rem; color: #475569; font-weight: 500; }
+.frp-badge--iicrc { background: #dbeafe; color: #1d4ed8; }
+.frp-badge--featured { background: #fef9c3; color: #a16207; font-weight: 600; }
+```
+
+**"Featured" label** — for `paid`/`featured`/`premium` tier pros, render a "Featured" badge alongside credentials. The existing `$is_accessible` variable (already defined in the template as `in_array($tier, ['paid', 'featured', 'premium'])`) is the correct gate. Add inside the `if ($is_claimed)` block:
+
+```php
+<?php if ( $is_claimed && $is_accessible ) : ?>
+    <span class="frp-badge frp-badge--featured">⭐ Featured</span>
+<?php endif; ?>
+```
+
+Place this as the first item inside `.frp-credential-badges` (before IICRC and other credential badges).
 
 The tier-gating for phone/CTAs is unchanged — it remains based on `listing_tier` only.
 
@@ -230,7 +251,7 @@ There is no hardcoded placeholder copy (no "architectural integrity", "resilient
 > "Want homeowners to call you directly? Upgrade your listing to show your phone number and receive leads straight to you. [See what's included →](/pricing/)"
 
 This applies only to:
-- The sidebar upsell note (`<p class="frp-upsell-note">`) — visible below the "Request Service" button in `#frp-profile-cta-sidebar` for free/basic tier pros
+- The sidebar upsell note (`<p class="frp-upsell-note">`) — visible in the `else` branch of `#frp-profile-cta-sidebar`, which renders for any tier NOT in `['paid', 'featured', 'premium']`. This includes both `free` and `basic` tier pros. `basic` ($49/month) does not unlock phone visibility or direct dispatch, so the same upsell copy applies — the upgrade path is `basic → paid`.
 
 Replace lines 241–244 with:
 
@@ -259,9 +280,19 @@ Both pages use the same badge/tier logic defined in `2026-04-26-homepage-redesig
 
 ## Additional Backend Change: Paid Listing Price
 
-Update `frp-billing.php`: change the `price_usd` constant for the `paid` tier from `19900` to `24900` cents ($199 → $249/month).
+**PHP constant (display price):** In `frp-billing.php`, change the `price_usd` value for the `paid` tier from `19900` to `24900` cents:
 
-This is a one-line constant change in the `FRP_TIERS` array entry for `paid`.
+```php
+'paid' => [ 'label' => 'Paid Listing', 'option' => 'frp_stripe_price_paid', 'price_usd' => 24900 ],
+```
+
+This is a display-only change — `price_usd` is returned by the `/billing/catalog` REST endpoint for pricing display in the UI.
+
+**Stripe price ID (ops task, not a code change):** The actual Stripe charge is controlled by the `frp_stripe_price_paid` WordPress option, which stores a Stripe Price object ID (e.g., `price_xxxxx`). Changing `price_usd` does NOT change what Stripe charges. To change the actual billing amount, ops must:
+1. Create a new Stripe Price object at $249/month in the Stripe dashboard
+2. Update the `frp_stripe_price_paid` WordPress option (via wp-admin → FRP Billing settings) to the new Price ID
+
+**Scope:** The PHP `price_usd` constant change is in scope for this implementation. The Stripe price object creation and option update are ops tasks — not in scope for this implementation but must happen before the new price takes effect for subscribers.
 
 ---
 
