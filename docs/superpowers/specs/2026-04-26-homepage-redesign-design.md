@@ -77,6 +77,7 @@ Selecting a card stores the value and slides to step 2.
 **Step 2 — Property type**
 Prompt: *"What type of property?"*
 Options: Residential / Commercial (two large buttons)
+Submitted values: `residential` / `commercial`
 
 **Step 3 — Urgency**
 Prompt: *"How urgent is it?"*
@@ -113,9 +114,16 @@ Header: `X-FRP-Lead-Token: <window.FRP_LEAD_TOKEN>`
 > ✓ **We're on it.**
 > A local restoration pro will contact you shortly. Check your phone.
 
-**Error state:** Inline error message below the submit button (e.g., invalid phone, rate limited).
+**Error state:** Inline error message below the submit button. Form remains editable after all errors so the user can correct and resubmit. Specific messages by HTTP status:
 
-**Pre-fill from service grid:** Service cards in Section 2 can launch the wizard with step 1 pre-selected, advancing directly to step 2.
+| Status | Copy shown to user | Form behavior |
+|---|---|---|
+| `400` (bad_request) | "Please check your information and try again." | Stays editable |
+| `429` (rate_limited) | "Too many requests. Please wait a few minutes and try again." | Submit button disabled for 60 seconds, then re-enabled |
+| `403` (forbidden) | "We couldn't verify your request. Please refresh the page and try again." | Stays editable |
+| Any other / network error | "Something went wrong. Please try again." | Stays editable |
+
+**Pre-fill from service grid:** Service cards in Section 2 call `window.frpWizardStart(serviceSlug)` — a globally exposed JS function defined by the wizard. The function scrolls to the hero, sets the service to `serviceSlug`, and renders step 2 directly (skipping step 1). Example: `frpWizardStart('water-damage')`. No URL param mechanism — JS function only.
 
 ### Background
 
@@ -196,9 +204,9 @@ Displays 2–3 real `restoration_pro` posts from the database (paid/featured/pre
 
 - Business name
 - Services offered
-- Coverage area
-- **Credential badges** — displayed only when the pro has self-reported them on their claimed listing (e.g., IICRC Certified, Licensed, Insured). No badges shown for unclaimed listings.
-- **"Featured" label** for paid/featured/premium tier pros
+- Coverage area — display logic: if the pro has `service_area_zips` meta set (non-empty), show "Serving N zip codes"; else if `state` meta is set, show "Serving [STATE] area"; else omit the line entirely
+- **Credential badges** — displayed only when the pro has `claim_status` meta equal to `claimed`. Pros with `claim_status` of `unclaimed`, `claim_pending`, or `disputed` show no badges. Badges shown are whatever credential meta fields the pro has self-reported (e.g., IICRC Certified, Licensed, Insured).
+- **"Featured" label** for paid/featured/premium tier pros (`listing_tier` = `paid`, `featured`, or `premium`)
 - CTA: **"View Profile →"** — links to the pro's individual profile page (`/profile/?slug=...` or CPT permalink)
 
 No platform-level trust bar. No blanket claims about verification. Credential details and the self-reported disclaimer live in the Terms of Service, not on this page.
@@ -207,13 +215,17 @@ No platform-level trust bar. No blanket claims about verification. Credential de
 
 The homepage pro cards reflect the same badge logic used on full profile pages:
 
-| Listing State | Badge Display |
-|---|---|
-| Unclaimed | No badges |
-| Claimed (free) | Self-reported credentials shown (IICRC, Licensed, Insured, years in business) |
-| Paid / Featured / Premium | All badges + "Featured" label + priority placement in teaser |
+| `claim_status` value | `listing_tier` | Badge Display |
+|---|---|---|
+| `unclaimed` / `claim_pending` / `disputed` | any | No badges |
+| `claimed` | `free` / `basic` | Self-reported credentials shown (IICRC, Licensed, Insured, years in business) |
+| `claimed` | `paid` / `featured` / `premium` | All badges + "Featured" label + priority placement in teaser |
 
 This progression is the primary incentive for pros to claim their free listing — claiming unlocks credential display sitewide (homepage teaser, directory, search results), and upgrading to paid unlocks additional visibility and direct lead dispatch.
+
+### Zero-Result Empty State
+
+If the `restoration_pro` WP_Query returns 0 results (no published pros with any listing tier), hide the pro cards grid entirely. Show only the section headline, subheadline, and the contractor acquisition CTA below. Do not show placeholder cards or a "no pros found" message.
 
 ### Footer CTA (for contractor acquisition)
 
