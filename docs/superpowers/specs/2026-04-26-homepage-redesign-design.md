@@ -261,7 +261,7 @@ Add to primary nav (if not already present):
 - Render full homepage HTML (hero through pro teaser)
 - Inline wizard JavaScript:
   - Multi-step state machine (steps 1–5)
-  - Pre-fill support via URL param or JS call (for service grid CTAs)
+  - Pre-fill support via JS call only — `window.frpWizardStart(serviceSlug)` (for service grid CTAs)
   - POST to `rest_url('frp/v1/leads')` (PHP-injected, not hardcoded)
   - `X-FRP-Lead-Token` from `window.FRP_LEAD_TOKEN`
   - Success and error state rendering
