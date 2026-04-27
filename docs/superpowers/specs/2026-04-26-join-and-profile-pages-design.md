@@ -65,7 +65,9 @@ The form submits to `POST /wp-json/frp/v1/apply`. All fields match endpoint para
 | IICRC Certified? | `iicrc_certified` | radio | No | Options: Yes / No / In Progress. Helper text: *"IICRC certification is displayed on your profile as a badge and improves credibility with homeowners."* |
 | License Number | `license_number` | text | No | |
 | Years in Business | `years_in_business` | number | No | `absint` server-side |
-| Service Area ZIP codes | `service_area_zips` | text | No | Comma-separated |
+| Service Area ZIP codes | `service_area_zips` | text | No | Comma-separated. Stored in CPT meta as `zip_codes` (existing backend mapping — no change needed). |
+
+Note: `contact_name` is accepted by the endpoint but is not surfaced on the public join form. It will be stored as an empty string and can be filled by ops if needed.
 
 **Submit button:** "Claim My Free Listing →"
 
@@ -77,7 +79,7 @@ No price shown on this page. Pricing is introduced post-claim from the contracto
 
 #### Form Submission Behavior
 
-- JS submits to `POST /wp-json/frp/v1/leads` — correction: `POST /wp-json/frp/v1/apply`
+- JS submits to `POST /wp-json/frp/v1/apply`
 - On `200`: Replace form with success message: *"Application received. Check your email — we'll be in touch within 1–2 business days."* If the matcher found an existing listing, the email will contain a claim verification link instead.
 - On `400`: Show inline field-level error (e.g., "Phone number is invalid")
 - On `429`: Show: *"Too many applications from this connection. Please try again later."* Disable submit for 60 seconds.
@@ -109,9 +111,10 @@ Icon: `trending_up`
 
 ### Backend Change: `iicrc_certified` Field
 
-The `/apply` endpoint (`frp_apply_handler` in `frp-directory.php`) needs one addition:
+The `/apply` endpoint in `frp-directory.php` uses a three-function chain: `frp_apply_handler` calls `frp_apply_validate()` (returns a structured array) which is then passed to either `frp_apply_insert_new()` or `frp_apply_initiate_claim()`. The `iicrc_certified` field flows through this chain as follows:
 
-**Read and store:**
+**Step 1 — Add to `frp_apply_validate()` return array:**
+
 ```php
 $iicrc = sanitize_text_field( (string) ( $r->get_param( 'iicrc_certified' ) ?? '' ) );
 // Allowed values: 'yes', 'no', 'in_progress'. Silently ignore anything else.
@@ -120,12 +123,25 @@ if ( ! in_array( $iicrc, [ 'yes', 'no', 'in_progress' ], true ) ) {
 }
 ```
 
-**Store on new draft pro post:**
+Add `'iicrc' => $iicrc` to the array returned by `frp_apply_validate()`.
+
+**Step 2 — Store in `frp_apply_insert_new()`:**
+
 ```php
-update_post_meta( $pro_id, 'iicrc_certified', $iicrc );
+update_post_meta( $pro_id, 'iicrc_certified', $a['iicrc'] );
 ```
 
-For claim flows (where the pro already exists), update the meta on the existing pro post if `$iicrc` is non-empty.
+Add this line alongside the other `update_post_meta` calls in `frp_apply_insert_new()`.
+
+**Step 3 — Update existing pro in `frp_apply_initiate_claim()`:**
+
+```php
+if ( $applicant['iicrc'] !== '' ) {
+    update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
+}
+```
+
+Add this inside `frp_apply_initiate_claim()` after `$pro_id` is resolved. Only write if non-empty — do not overwrite an existing value with blank.
 
 **No validation required** — field is optional. Missing or invalid values are silently cleared.
 
@@ -163,9 +179,9 @@ The tier-gating for phone/CTAs is unchanged — it remains based on `listing_tie
 
 ### Change 2: Copy Polish
 
-Remove hardcoded elevated placeholder copy. The profile page renders the pro's actual `description` meta field for the business description. Where placeholder text currently exists (e.g., "Certified specialists in structural recovery and environmental remediation. We serve the greater metropolitan area with 24/7 emergency response protocols and a commitment to architectural integrity."), replace with a conditional:
+Remove hardcoded elevated placeholder copy. The profile page currently reads `get_post_meta( $pro_id, 'bio', true )` and stores it in `$bio` (line 47 of `frp-pro-template.php`). This is the display field for the business description. Where placeholder text currently exists (e.g., "Certified specialists in structural recovery and environmental remediation. We serve the greater metropolitan area with 24/7 emergency response protocols and a commitment to architectural integrity."), replace with a conditional on `$bio`:
 
-- If `description` meta is set and non-empty: render it
+- If `$bio` is set and non-empty: render it
 - If empty: render nothing (no placeholder copy)
 
 Section headings that use elevated language:
@@ -185,9 +201,10 @@ Remove any hardcoded copy that references "architectural integrity", "resilient 
 **New copy:**
 > "Want homeowners to call you directly? Upgrade your listing to show your phone number and receive leads straight to you. [See what's included →](/pricing/)"
 
-This applies to both:
-- The sidebar upsell note (visible below the "Request Service" button for free/basic tier pros)
-- The mobile sticky bar equivalent (if upsell text appears there)
+This applies only to:
+- The sidebar upsell note (`<p class="frp-upsell-note">`) — visible below the "Request Service" button in `#frp-profile-cta-sidebar` for free/basic tier pros
+
+The mobile sticky bar (`#frp-profile-sticky-bar`) currently contains only a button — no upsell text. No change needed there.
 
 ---
 
@@ -203,10 +220,27 @@ Both pages use the same badge/tier logic defined in `2026-04-26-homepage-redesig
 
 ---
 
+---
+
+## Additional Backend Change: Paid Listing Price
+
+Update `frp-billing.php`: change the `price_usd` constant for the `paid` tier from `19900` to `24900` cents ($199 → $249/month).
+
+This is a one-line constant change in the `FRP_TIERS` array entry for `paid`.
+
+---
+
+## Notes for Engineers
+
+- **`contact_name` field** — `frp_apply_validate()` reads a `contact_name` parameter and `frp_apply_insert_new()` stores it as CPT meta. This field is intentionally absent from the join page form. It will be stored as an empty string for all applications from this page; ops can fill it later if needed.
+
+- **`premium` tier** — `premium` is a valid `listing_tier` value in the tier gate (whitelist includes it) and in the badge logic table above. However, there is currently no `premium` entry in `FRP_TIERS` in `frp-billing.php` — it has no billing path and must be assigned manually via the admin. No code change needed; engineers should not assume `premium` is fully wired end-to-end.
+
+---
+
 ## Roadmap Items (Not in This Spec)
 
 - **Zip code slot cap** — limit paid pros per geographic area to reduce lead pool competition. Copy to be added to join page benefits once system is enforced.
 - **Contractor dashboard analytics** — separate spec. Baseline (B): call count, lead list, volume chart. Advanced upsell (C): deeper analytics.
 - **GoHighLevel (GHL) integration** — premium tier upsell for AI voice, call tracking, CRM automations. Separate spec.
 - **CallRail integration** — alternative/simpler call tracking for mid-tier. Separate spec.
-- **Paid listing price** — confirmed at $249/month. Update `frp-billing.php` constant `price_usd` for the `paid` tier from `19900` to `24900` cents as part of this implementation.
