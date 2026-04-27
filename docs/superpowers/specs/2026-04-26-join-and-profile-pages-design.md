@@ -149,6 +149,8 @@ update_post_meta( $pro_id, 'phone', $a['phone'] );
 
 `$pro_id` is resolved as `$pro_id = $match['pro_id']` (note: `pro_id`, not `id`). However, the function has an early-return path (no on-file email → routes to manual review) immediately after `$pro_id` resolution. Do **not** place the write before that guard — data should only be written when the claim proceeds normally.
 
+The `$applicant` argument is the direct return value of `frp_apply_validate()` (see `frp_apply_handler` line 1657: `$applicant = frp_apply_validate($request)`). It is passed unchanged to `frp_apply_initiate_claim()` at lines 1664 and 1667. Therefore `$applicant['phone']` and `$applicant['iicrc']` (after Step 1 adds `iicrc` to compact) are both valid keys.
+
 Place both writes among the other `update_post_meta` calls (after line 1702, starting around line 1709):
 
 ```php
@@ -223,15 +225,19 @@ Add minimal CSS for `.frp-credential-badges` and `.frp-badge` in the `<style>` b
 .frp-badge--featured { background: #fef9c3; color: #a16207; font-weight: 600; }
 ```
 
-**"Featured" label** — for `paid`/`featured`/`premium` tier pros, render a "Featured" badge alongside credentials. The existing `$is_accessible` variable (already defined in the template as `in_array($tier, ['paid', 'featured', 'premium'])`) is the correct gate. Add inside the `if ($is_claimed)` block:
+**Elevated listing badge** — for `paid`/`featured`/`premium` tier pros, render a highlighted badge alongside credentials. This is consistent with the homepage spec which uses the "Featured" label for all three tiers in the pro directory teaser. The existing `$is_accessible` variable (already defined as `in_array($tier, ['paid', 'featured', 'premium'])`) is the correct gate.
+
+Note: The label "Featured" applies to all accessible tiers (`paid`, `featured`, `premium`), not only the `featured` tier specifically. This is intentional — it signals elevated listing status, not tier rank. Consistent with homepage badge logic in `2026-04-26-homepage-redesign-design.md`.
+
+The PHP block (already included above in the `.frp-credential-badges` block) is:
 
 ```php
-<?php if ( $is_claimed && $is_accessible ) : ?>
+<?php if ( $is_accessible ) : ?>
     <span class="frp-badge frp-badge--featured">⭐ Featured</span>
 <?php endif; ?>
 ```
 
-Place this as the first item inside `.frp-credential-badges` (before IICRC and other credential badges).
+This renders as the first badge inside `.frp-credential-badges`, only when `$is_claimed` (outer guard) is also true.
 
 The tier-gating for phone/CTAs is unchanged — it remains based on `listing_tier` only.
 
