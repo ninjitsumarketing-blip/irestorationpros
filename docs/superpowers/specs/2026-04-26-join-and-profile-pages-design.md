@@ -61,7 +61,7 @@ The form submits to `POST /wp-json/frp/v1/apply`. All fields match endpoint para
 | Phone | `dispatch_phone` | tel | Yes | Regex validated server-side |
 | Email | `contact_email` | email | Yes | |
 | State | `state` | select | Yes | All 50 US states + DC |
-| Services | `services[]` | checkboxes | No | water-damage, fire-damage, mold-remediation, storm-damage, sewage-cleanup, structural, biohazard-cleanup |
+| Services | `services` | checkboxes | No | water-damage, fire-damage, mold-remediation, storm-damage, sewage-cleanup, structural, biohazard-cleanup. Submit as JSON array: `"services": ["water-damage", ...]`. Endpoint reads `get_param('services')` — no bracket notation in the request body. |
 | IICRC Certified? | `iicrc_certified` | radio | No | Options: Yes / No / In Progress. Helper text: *"IICRC certification is displayed on your profile as a badge and improves credibility with homeowners."* |
 | License Number | `license_number` | text | No | |
 | Years in Business | `years_in_business` | number | No | `absint` server-side |
@@ -129,13 +129,21 @@ if ( ! in_array( $iicrc, [ 'yes', 'no', 'in_progress' ], true ) ) {
 
 Then add `iicrc` to the `compact()` call: `return compact('business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services', 'iicrc')`.
 
-**Step 2 — Store in `frp_apply_insert_new()`:**
+**Step 2 — Store in `frp_apply_insert_new()`, and fix phone meta key gap:**
 
 ```php
 update_post_meta( $pro_id, 'iicrc_certified', $a['iicrc'] );
 ```
 
 Add this line alongside the other `update_post_meta` calls in `frp_apply_insert_new()`.
+
+**Also add this in `frp_apply_insert_new()`** (alongside the existing `dispatch_phone` write):
+
+```php
+update_post_meta( $pro_id, 'phone', $a['phone'] );
+```
+
+**Why:** The profile template reads the `phone` meta key (line 42 of `frp-pro-template.php`). The apply endpoint currently only writes `dispatch_phone`. Without this fix, any contractor who joins through the new form will have an empty `phone` meta, meaning their phone number will never appear on their profile page even after upgrading to a paid tier.
 
 **Step 3 — Update existing pro in `frp_apply_initiate_claim()`:**
 
