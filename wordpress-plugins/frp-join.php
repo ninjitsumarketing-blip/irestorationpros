@@ -226,10 +226,16 @@ function frp_join_form_render() : string {
         // Do NOT send services: [] to avoid any edge-case handling of empty JSON array.
         if (services.length) { body.services = services; }
 
-        // years_in_business: endpoint uses absint — send as integer
+        // years_in_business: endpoint uses absint — send as integer; omit when blank
         if (body.years_in_business !== undefined && body.years_in_business !== '') {
             body.years_in_business = parseInt(body.years_in_business, 10) || 0;
+        } else {
+            delete body.years_in_business;
         }
+
+        // Omit optional string fields when blank — avoids writing empty meta values
+        if (!body.license_number)    { delete body.license_number; }
+        if (!body.service_area_zips) { delete body.service_area_zips; }
 
         fetch(APPLY_URL, {
             method: 'POST',
