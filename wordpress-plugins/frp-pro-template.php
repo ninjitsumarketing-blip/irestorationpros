@@ -46,6 +46,12 @@ $city    = get_post_meta( $pro_id, 'city', true ) ?: '';
 $state   = get_post_meta( $pro_id, 'state', true ) ?: '';
 $bio     = get_post_meta( $pro_id, 'bio', true ) ?: '';
 
+$claim_status   = (string) get_post_meta( $pro_id, 'claim_status', true );
+$is_claimed     = ( $claim_status === 'claimed' );
+$iicrc_status   = (string) get_post_meta( $pro_id, 'iicrc_certified', true );
+$certifications = (string) get_post_meta( $pro_id, 'certifications', true );
+$years_in_biz   = (int)    get_post_meta( $pro_id, 'years_in_business', true );
+
 // Services — comma-separated string → array of trimmed slugs
 $services_raw  = get_post_meta( $pro_id, 'services', true ) ?: '';
 $services      = $services_raw
@@ -146,6 +152,12 @@ get_header();
 .frp-meta-row { font-size: .875rem; color: #475569; margin-bottom: .4rem; }
 .frp-confirm-msg { font-size: .9rem; color: #16a34a; font-weight: 500; padding: .5rem 0; }
 
+/* ── Credential badges ── */
+.frp-credential-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin: .75rem 0; }
+.frp-badge { display: inline-block; padding: .2rem .6rem; background: #f1f5f9; border-radius: 999px; font-size: .8rem; color: #475569; font-weight: 500; }
+.frp-badge--iicrc { background: #dbeafe; color: #1d4ed8; }
+.frp-badge--featured { background: #fef9c3; color: #a16207; font-weight: 600; }
+
 /* ── Sticky bar (mobile only) ── */
 #frp-profile-sticky-bar {
     display: none;
@@ -211,6 +223,24 @@ get_header();
         <?php if ( $bio ) : ?>
             <p><?php echo esc_html( $bio ); ?></p>
         <?php endif; ?>
+        <?php if ( $is_claimed ) : ?>
+        <div class="frp-credential-badges">
+            <?php if ( $is_accessible ) : ?>
+                <span class="frp-badge frp-badge--featured">⭐ Featured</span>
+            <?php endif; ?>
+            <?php if ( $iicrc_status === 'yes' ) : ?>
+                <span class="frp-badge frp-badge--iicrc">✓ IICRC Certified</span>
+            <?php endif; ?>
+            <?php if ( $certifications ) : ?>
+                <?php foreach ( array_filter( array_map( 'trim', explode( ',', $certifications ) ) ) as $cert ) : ?>
+                    <span class="frp-badge"><?php echo esc_html( $cert ); ?></span>
+                <?php endforeach; ?>
+            <?php endif; ?>
+            <?php if ( $years_in_biz > 0 ) : ?>
+                <span class="frp-badge"><?php echo esc_html( $years_in_biz ); ?> yrs in business</span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- ── Sidebar ── -->
@@ -239,8 +269,8 @@ get_header();
             <p class="frp-sidebar-tagline"><?php echo esc_html( $pro_name ); ?> is ready to help</p>
             <button type="button" class="frp-btn-primary frp-open-modal">Request Service →</button>
             <p class="frp-upsell-note">
-                <a href="<?php echo esc_url( home_url( '/pricing/' ) ); ?>">Upgrade your listing</a>
-                so customers can reach you directly
+                Want homeowners to call you directly? Upgrade your listing to show your phone number and receive leads straight to you.
+                <a href="<?php echo esc_url( home_url( '/pricing/' ) ); ?>">See what's included →</a>
             </p>
 
         <?php endif; ?>
