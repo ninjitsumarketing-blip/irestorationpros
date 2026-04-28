@@ -1589,6 +1589,10 @@ function frp_apply_validate( WP_REST_Request $r ) : array|WP_Error {
     $city     = sanitize_text_field( (string) ( $r->get_param( 'service_area_city' ) ?? '' ) );
     $state    = strtoupper( sanitize_text_field( (string) ( $r->get_param( 'state' ) ?? '' ) ) );
     $services_raw = (array) ( $r->get_param( 'services' ) ?? [] );
+    $iicrc = sanitize_text_field( (string) ( $r->get_param( 'iicrc_certified' ) ?? '' ) );
+    if ( ! in_array( $iicrc, [ 'yes', 'no', 'in_progress' ], true ) ) {
+        $iicrc = '';
+    }
 
     if ( ! $business || ! $email || ! $phone || ! $state ) {
         return new WP_Error( 'bad_request', 'business_name, contact_email, dispatch_phone, state are required.', [ 'status' => 400 ] );
@@ -1604,7 +1608,7 @@ function frp_apply_validate( WP_REST_Request $r ) : array|WP_Error {
         return new WP_Error( 'bad_request', 'One or more services are invalid.', [ 'status' => 400 ] );
     }
 
-    return compact( 'business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services' );
+    return compact( 'business', 'contact', 'email', 'phone', 'license', 'years', 'zips', 'city', 'state', 'services', 'iicrc' );
 }
 
 /**
@@ -1639,6 +1643,8 @@ function frp_apply_insert_new( array $a ) : array|WP_Error {
     update_post_meta( $pro_id, 'is_paid_listing',    0 );
     update_post_meta( $pro_id, 'joined_source',      'apply_new' );
     update_post_meta( $pro_id, 'date_seeded',        gmdate( 'c' ) );
+    update_post_meta( $pro_id, 'iicrc_certified',    $a['iicrc'] );
+    update_post_meta( $pro_id, 'phone',              $a['phone'] );
 
     // Fire notification (Task 1.9 will hook into this action for emails)
     do_action( 'frp_application_submitted', $pro_id );
@@ -1711,6 +1717,13 @@ function frp_apply_initiate_claim( array $applicant, array $match, bool $need_ad
     update_post_meta( $pro_id, 'claim_token_expiry',    $claim_expiry );
     update_post_meta( $pro_id, 'claim_applicant_email', $applicant['email'] );
     update_post_meta( $pro_id, 'claim_applicant_phone', $applicant['phone'] );
+    // ── new lines below ──
+    if ( $applicant['iicrc'] !== '' ) {
+        update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
+    }
+    if ( $applicant['phone'] !== '' ) {
+        update_post_meta( $pro_id, 'phone', $applicant['phone'] );
+    }
 
     if ( $need_admin_ticket ) {
         frp_apply_open_review_ticket( $applicant, array_merge( $match, [ 'safety_net' => true ] ) );
