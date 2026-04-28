@@ -223,7 +223,13 @@ get_header();
         <?php if ( $bio ) : ?>
             <p><?php echo esc_html( $bio ); ?></p>
         <?php endif; ?>
-        <?php if ( $is_claimed ) : ?>
+        <?php
+        $cert_list   = $certifications
+            ? array_filter( array_map( 'trim', explode( ',', $certifications ) ) )
+            : [];
+        $has_badges  = $is_accessible || ( $iicrc_status === 'yes' ) || $cert_list || ( $years_in_biz > 0 );
+        ?>
+        <?php if ( $is_claimed && $has_badges ) : ?>
         <div class="frp-credential-badges">
             <?php if ( $is_accessible ) : ?>
                 <span class="frp-badge frp-badge--featured">⭐ Featured</span>
@@ -231,11 +237,9 @@ get_header();
             <?php if ( $iicrc_status === 'yes' ) : ?>
                 <span class="frp-badge frp-badge--iicrc">✓ IICRC Certified</span>
             <?php endif; ?>
-            <?php if ( $certifications ) : ?>
-                <?php foreach ( array_filter( array_map( 'trim', explode( ',', $certifications ) ) ) as $cert ) : ?>
-                    <span class="frp-badge"><?php echo esc_html( $cert ); ?></span>
-                <?php endforeach; ?>
-            <?php endif; ?>
+            <?php foreach ( $cert_list as $cert ) : ?>
+                <span class="frp-badge"><?php echo esc_html( $cert ); ?></span>
+            <?php endforeach; ?>
             <?php if ( $years_in_biz > 0 ) : ?>
                 <span class="frp-badge"><?php echo esc_html( $years_in_biz ); ?> yrs in business</span>
             <?php endif; ?>
