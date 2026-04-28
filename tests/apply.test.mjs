@@ -69,8 +69,22 @@ test('apply stores iicrc_certified=in_progress', async () => {
   assert.equal(stored, 'in_progress');
 });
 
-test('apply ignores invalid iicrc_certified values', async () => {
+test('apply stores iicrc_certified=no', async () => {
   const uid = Date.now() + 2;
+  const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
+    business_name: `IICRC No ${uid}`,
+    contact_email: `iicrcno${uid}@test.invalid`,
+    dispatch_phone: '5550004444',
+    state: 'WA',
+    iicrc_certified: 'no',
+  });
+  assert.equal(status, 200);
+  const stored = await readMeta(body.application_id, 'iicrc_certified');
+  assert.equal(stored, 'no');
+});
+
+test('apply ignores invalid iicrc_certified values', async () => {
+  const uid = Date.now() + 3;
   const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
     business_name: `IICRC Invalid ${uid}`,
     contact_email: `invalid${uid}@test.invalid`,
@@ -84,7 +98,7 @@ test('apply ignores invalid iicrc_certified values', async () => {
 });
 
 test('apply writes phone meta key (not only dispatch_phone)', async () => {
-  const uid = Date.now() + 3;
+  const uid = Date.now() + 4;
   const { status, body } = await frpPost('/wp-json/frp/v1/apply', {
     business_name: `Phone Meta Test ${uid}`,
     contact_email: `phonemeta${uid}@test.invalid`,

@@ -1643,6 +1643,7 @@ function frp_apply_insert_new( array $a ) : array|WP_Error {
     update_post_meta( $pro_id, 'is_paid_listing',    0 );
     update_post_meta( $pro_id, 'joined_source',      'apply_new' );
     update_post_meta( $pro_id, 'date_seeded',        gmdate( 'c' ) );
+    // New post — no prior value to preserve; empty string is the correct sentinel for "not provided".
     update_post_meta( $pro_id, 'iicrc_certified',    $a['iicrc'] );
     update_post_meta( $pro_id, 'phone',              $a['phone'] );
 
@@ -1717,7 +1718,7 @@ function frp_apply_initiate_claim( array $applicant, array $match, bool $need_ad
     update_post_meta( $pro_id, 'claim_token_expiry',    $claim_expiry );
     update_post_meta( $pro_id, 'claim_applicant_email', $applicant['email'] );
     update_post_meta( $pro_id, 'claim_applicant_phone', $applicant['phone'] );
-    // ── new lines below ──
+
     if ( $applicant['iicrc'] !== '' ) {
         update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
     }
