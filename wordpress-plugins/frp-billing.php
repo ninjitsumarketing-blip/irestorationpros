@@ -16,7 +16,7 @@ if ( file_exists( $frp_autoload ) ) {
 
 const FRP_TIERS = [
     'basic'    => [ 'label' => 'Basic Listing',    'option' => 'frp_stripe_price_basic',    'price_usd' => 4900  ],
-    'paid'     => [ 'label' => 'Paid Listing',     'option' => 'frp_stripe_price_paid',     'price_usd' => 19900 ],
+    'paid'     => [ 'label' => 'Paid Listing',     'option' => 'frp_stripe_price_paid',     'price_usd' => 24900 ],
     'featured' => [ 'label' => 'Featured Listing', 'option' => 'frp_stripe_price_featured', 'price_usd' => 49900 ],
 ];
 
