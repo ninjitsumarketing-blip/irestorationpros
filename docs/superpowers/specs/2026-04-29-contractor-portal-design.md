@@ -64,6 +64,10 @@ Statuses: `pending` | `contacted` | `won` | `lost` | `missed`
 ### `lead_current_assignee`
 Integer pro ID. The pro currently on the hook for this lead. Updated to the next pro when fallback fires. Null when lead has been won or exhausted all matches.
 
+### Initial entry responsibility
+
+When a lead is first dispatched in `frp-directory.php`, the dispatching code is responsible for writing the first `pending` entry to `lead_routing_history`, setting `lead_current_assignee`, and setting `lead_response_deadline`. `frp-leads.php` only adds subsequent entries (on fallback). This contract between the two files must be implemented in `frp-directory.php` as part of this feature.
+
 ---
 
 ## Backend: `frp-leads.php` (new file)
@@ -95,9 +99,21 @@ Integer pro ID. The pro currently on the hook for this lead. Updated to the next
 
 Returns a single JSON object. Computed on demand, no caching.
 
+### REST Endpoint: `POST /frp/v1/admin/trigger-deadline-cron` (test/ops helper)
+
+**Auth:** `manage_options` capability only.
+
+Manually triggers `frp_process_lead_deadlines` — used by integration tests to fire the cron job on demand without waiting for the scheduler. Also useful for ops debugging. Returns `{ "processed": N }` count of leads acted on.
+
 ### WP-Cron Job: `frp_process_lead_deadlines`
 
-Registered on plugin load with `wp_schedule_event`, runs every 15 minutes using a custom `frp_quarter_hour` interval.
+Registered on plugin load with `wp_schedule_event` using the standard duplicate-registration guard:
+```php
+if ( ! wp_next_scheduled( 'frp_process_lead_deadlines' ) ) {
+    wp_schedule_event( time(), 'frp_quarter_hour', 'frp_process_lead_deadlines' );
+}
+```
+Runs every 15 minutes using a custom `frp_quarter_hour` interval (registered via `cron_schedules` filter).
 
 **On each run:**
 1. Query all `frp_lead` posts where `lead_response_deadline` is in the past and `lead_current_assignee` is not null.
