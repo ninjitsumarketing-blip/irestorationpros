@@ -227,13 +227,17 @@ get_header();
         $cert_list   = $certifications
             ? array_filter( array_map( 'trim', explode( ',', $certifications ) ) )
             : [];
-        $has_badges  = $is_accessible || ( $iicrc_status === 'yes' ) || $cert_list || ( $years_in_biz > 0 );
+        // "Featured" badge is reserved for the featured/premium tiers only.
+        // The paid tier ($249/mo) is accessible but uses a different label in FRP_TIERS.
+        $is_featured_tier = in_array( $tier, [ 'featured', 'premium' ], true );
+        $has_badges  = $is_featured_tier || ( $iicrc_status === 'yes' ) || $cert_list || ( $years_in_biz > 0 );
         ?>
         <?php if ( $is_claimed && $has_badges ) : ?>
         <div class="frp-credential-badges">
-            <?php if ( $is_accessible ) : ?>
+            <?php if ( $is_featured_tier ) : ?>
                 <span class="frp-badge frp-badge--featured">⭐ Featured</span>
             <?php endif; ?>
+            <?php // iicrc_certified='in_progress' intentionally shows no badge — only 'yes' earns the credential display. ?>
             <?php if ( $iicrc_status === 'yes' ) : ?>
                 <span class="frp-badge frp-badge--iicrc">✓ IICRC Certified</span>
             <?php endif; ?>

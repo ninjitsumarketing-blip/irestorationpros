@@ -1719,6 +1719,9 @@ function frp_apply_initiate_claim( array $applicant, array $match, bool $need_ad
     update_post_meta( $pro_id, 'claim_applicant_email', $applicant['email'] );
     update_post_meta( $pro_id, 'claim_applicant_phone', $applicant['phone'] );
 
+    // Guard: only overwrite existing meta if applicant supplied a value.
+    // Test coverage for this path requires a seeded matching pro on staging
+    // (strong/medium match); the insert_new path is covered by apply.test.mjs.
     if ( $applicant['iicrc'] !== '' ) {
         update_post_meta( $pro_id, 'iicrc_certified', $applicant['iicrc'] );
     }
