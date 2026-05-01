@@ -56,6 +56,10 @@ function frp_leads_register_routes() {
 
 function frp_leads_permission_check() {
     if ( ! is_user_logged_in() ) return new WP_Error( 'rest_forbidden', 'Authentication required.', [ 'status' => 401 ] );
+    $user = wp_get_current_user();
+    if ( ! in_array( 'restoration_pro', (array) $user->roles, true ) ) {
+        return new WP_Error( 'rest_forbidden', 'Contractor role required.', [ 'status' => 403 ] );
+    }
     $pro_id = frp_current_pro_id();
     if ( ! $pro_id ) return new WP_Error( 'rest_forbidden', 'No contractor profile found.', [ 'status' => 403 ] );
     return true;
@@ -95,8 +99,8 @@ function frp_leads_update_status( WP_REST_Request $req ) {
         return new WP_Error( 'invalid_state', 'Routing history entry not found.', [ 'status' => 422 ] );
     }
 
-    // Already responded check (responded_at already set and status not pending)
-    if ( $history[ $entry_idx ]['responded_at'] !== null && $history[ $entry_idx ]['status'] !== 'pending' ) {
+    // Already responded check (status not pending)
+    if ( $history[ $entry_idx ]['status'] !== 'pending' ) {
         return new WP_Error( 'already_actioned', 'Lead already actioned.', [ 'status' => 409 ] );
     }
 
