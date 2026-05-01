@@ -1067,7 +1067,7 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
 
     // 3. Sanitize and validate inputs
     $valid_services = [ 'water-damage','mold-remediation','fire-damage','storm-damage','sewage-cleanup','structural','biohazard-cleanup' ];
-    $valid_urgency  = [ 'now', '24hrs', 'older' ];
+    $valid_urgency  = [ 'now', '24hrs', 'older', 'emergency' ];
     $valid_property = [ 'residential', 'commercial' ];
     $valid_insurance= [ 'yes', 'no', 'not-sure' ];
     $valid_sources  = [ 'guided_flow', 'followup_modal', 'emergency_flow', 'profile_form' ];
