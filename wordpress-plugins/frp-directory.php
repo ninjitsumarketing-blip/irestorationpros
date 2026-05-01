@@ -1279,6 +1279,28 @@ function frp_lead_create_handler( WP_REST_Request $request ) {
     ) );
     update_post_meta( $post_id, 'dispatch_tier', $dispatch_result['tier'] );
 
+    // ── Lead lifecycle init ────────────────────────────────────────────────
+    // Write the three lifecycle meta keys required by frp-leads.php.
+    // frp-leads.php handles subsequent entries (fallback). This block owns
+    // the first entry only.
+    if ( ! empty( $dispatch_result['pros'] ) ) {
+        $first_pro_id   = (int) $dispatch_result['pros'][0]['post_id'];
+        $now_ts         = time();
+        $deadline_delta = ( $urgency === 'emergency' ) ? HOUR_IN_SECONDS : DAY_IN_SECONDS;
+
+        $routing_entry = [
+            'pro_id'       => $first_pro_id,
+            'assigned_at'  => $now_ts,
+            'responded_at' => null,
+            'status'       => 'pending',
+        ];
+
+        update_post_meta( $post_id, 'lead_routing_history',   wp_json_encode( [ $routing_entry ] ) );
+        update_post_meta( $post_id, 'lead_current_assignee',  $first_pro_id );
+        update_post_meta( $post_id, 'lead_response_deadline', $now_ts + $deadline_delta );
+    }
+    // ── End lead lifecycle init ────────────────────────────────────────────
+
     // 12. Fire Make.com webhook (non-blocking)
     frp_fire_lead_webhook( $post_id, $score, $dispatch_result, [
         'phone'            => $phone,
