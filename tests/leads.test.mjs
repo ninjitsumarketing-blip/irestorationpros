@@ -17,7 +17,7 @@ test('dispatch writes routing history, current assignee, and deadline', async ()
     property_type: 'residential',
     has_insurance: 'yes',
     zip:           '90210',
-    source:        'test',
+    source:        'guided_flow',
   });
 
   assert.equal(status, 200, `Lead create failed: ${JSON.stringify(body)}`);
@@ -65,8 +65,8 @@ test('dispatch uses 1-hour deadline for emergency urgency', async () => {
     property_type: 'residential',
     has_insurance: 'yes',
     zip:           '90210',
-    source:        'test',
-  }, { noAuth: true });
+    source:        'guided_flow',
+  });
 
   assert.equal(status, 200, `Emergency lead create failed: ${JSON.stringify(body)}`);
   const lead_id = body.lead_id;
