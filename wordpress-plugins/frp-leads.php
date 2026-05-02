@@ -121,11 +121,131 @@ function frp_leads_update_status( WP_REST_Request $req ) {
     return rest_ensure_response( [ 'ok' => true, 'status' => $new_status ] );
 }
 
-// Stub — will be replaced with full implementation in Task 3
 function frp_leads_trigger_deadline_cron() {
-    if ( function_exists( 'frp_process_lead_deadlines' ) ) {
-        $processed = frp_process_lead_deadlines();
-        return rest_ensure_response( [ 'processed' => $processed ] );
+    $processed = frp_process_lead_deadlines();
+    return rest_ensure_response( [ 'processed' => $processed ] );
+}
+
+// ── WP-Cron: Lead Deadline Processor ─────────────────────────────────────────
+
+// Register custom 15-minute interval
+add_filter( 'cron_schedules', 'frp_leads_add_cron_interval' );
+function frp_leads_add_cron_interval( $schedules ) {
+    if ( ! isset( $schedules['frp_quarter_hour'] ) ) {
+        $schedules['frp_quarter_hour'] = [
+            'interval' => 15 * MINUTE_IN_SECONDS,
+            'display'  => __( 'Every 15 Minutes' ),
+        ];
     }
-    return rest_ensure_response( [ 'processed' => 0 ] );
+    return $schedules;
+}
+
+// Schedule on plugin load (guard against duplicate registration)
+add_action( 'init', 'frp_leads_schedule_cron' );
+function frp_leads_schedule_cron() {
+    if ( ! wp_next_scheduled( 'frp_process_lead_deadlines' ) ) {
+        wp_schedule_event( time(), 'frp_quarter_hour', 'frp_process_lead_deadlines' );
+    }
+}
+
+add_action( 'frp_process_lead_deadlines', 'frp_process_lead_deadlines' );
+
+/**
+ * Process overdue leads: mark missed, attempt fallback routing.
+ * Called by WP-Cron and by the admin trigger endpoint.
+ *
+ * @return int Number of leads processed.
+ */
+function frp_process_lead_deadlines() {
+    $now   = time();
+    $count = 0;
+
+    $overdue = new WP_Query( [
+        'post_type'      => 'frp_lead',
+        'post_status'    => 'publish',
+        'posts_per_page' => 100,
+        'meta_query'     => [
+            'relation' => 'AND',
+            [
+                'key'     => 'lead_response_deadline',
+                'value'   => $now,
+                'compare' => '<',
+                'type'    => 'NUMERIC',
+            ],
+            [
+                'key'     => 'lead_current_assignee',
+                'value'   => '',
+                'compare' => '!=',
+            ],
+        ],
+    ] );
+
+    foreach ( $overdue->posts as $lead ) {
+        $lead_id = $lead->ID;
+
+        try {
+            $history_raw      = get_post_meta( $lead_id, 'lead_routing_history', true );
+            $history          = $history_raw ? json_decode( $history_raw, true ) : [];
+            $current_assignee = (int) get_post_meta( $lead_id, 'lead_current_assignee', true );
+
+            // Find the current assignee's entry and mark missed
+            foreach ( $history as &$entry ) {
+                if ( (int) $entry['pro_id'] === $current_assignee && $entry['status'] === 'pending' ) {
+                    $entry['status']       = 'missed';
+                    $entry['responded_at'] = $now;
+                    break;
+                }
+            }
+            unset( $entry );
+
+            // Collect all tried pro IDs for exclusion
+            $tried_ids = array_map( fn($e) => (int) $e['pro_id'], $history );
+
+            // Attempt fallback routing
+            $zip     = get_post_meta( $lead_id, 'lead_zip',     true );
+            $service = get_post_meta( $lead_id, 'lead_service', true );
+            $urgency = get_post_meta( $lead_id, 'lead_urgency', true );
+
+            $next_pro_id = 0;
+            if ( $zip && $service && function_exists( 'frp_find_dispatch_pros' ) ) {
+                $result = frp_find_dispatch_pros( $zip, $service );
+                foreach ( $result['pros'] ?? [] as $candidate ) {
+                    $cid = (int) $candidate['post_id'];
+                    if ( ! in_array( $cid, $tried_ids, true ) ) {
+                        $next_pro_id = $cid;
+                        break;
+                    }
+                }
+            }
+
+            if ( $next_pro_id ) {
+                // Route to next pro
+                $deadline_delta = ( $urgency === 'emergency' ) ? HOUR_IN_SECONDS : DAY_IN_SECONDS;
+                $history[] = [
+                    'pro_id'       => $next_pro_id,
+                    'assigned_at'  => $now,
+                    'responded_at' => null,
+                    'status'       => 'pending',
+                ];
+                update_post_meta( $lead_id, 'lead_routing_history',   wp_json_encode( $history ) );
+                update_post_meta( $lead_id, 'lead_current_assignee',  $next_pro_id );
+                update_post_meta( $lead_id, 'lead_response_deadline', $now + $deadline_delta );
+
+                // Trigger notification email to next pro
+                do_action( 'frp_lead_created', $lead_id );
+            } else {
+                // No more pros — lead exhausted
+                update_post_meta( $lead_id, 'lead_routing_history',   wp_json_encode( $history ) );
+                update_post_meta( $lead_id, 'lead_current_assignee',  '' );
+                update_post_meta( $lead_id, 'lead_response_deadline', '' );
+            }
+
+            $count++;
+        } catch ( Throwable $e ) {
+            error_log( "[frp_process_lead_deadlines] Error on lead {$lead_id}: " . $e->getMessage() );
+            // Continue to next lead — don't halt the batch
+        }
+    }
+
+    return $count;
 }

@@ -249,6 +249,64 @@ test('status endpoint — already responded returns 409', async () => {
   assert.equal(status, 409, 'Already-actioned lead must return 409');
 });
 
+test('deadline fallback: overdue lead marks missed and reassigns or exhausts', async () => {
+  const { pro_id } = await loginAsPro('testpro1');
+  assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
+
+  const uid = Date.now();
+  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+    phone: `555${uid.toString().slice(-7)}`,
+    service: 'water-damage', urgency: 'now',
+    property_type: 'residential', has_insurance: 'yes',
+    zip: '90210', source: 'guided_flow',
+  });
+  assert.equal(createRes.status, 200);
+  const lead_id = createRes.body.lead_id;
+  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
+    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
+
+  const pastDeadline = String(Math.floor(Date.now() / 1000) - 7200); // 2 hours ago
+  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000) - 7200, responded_at: null, status: 'pending' }];
+  await setPostMeta(lead_id, 'lead_routing_history',   JSON.stringify(history));
+  await setPostMeta(lead_id, 'lead_current_assignee',  String(pro_id));
+  await setPostMeta(lead_id, 'lead_response_deadline', pastDeadline);
+
+  // Trigger the cron job manually
+  const { status: triggerStatus, body: triggerBody } = await frpPost(
+    '/wp-json/frp/v1/admin/trigger-deadline-cron', {}, { auth: true }
+  );
+  assert.equal(triggerStatus, 200, `trigger-deadline-cron failed: ${JSON.stringify(triggerBody)}`);
+  assert.ok(typeof triggerBody.processed === 'number', 'trigger response must include numeric processed count');
+  assert.ok(triggerBody.processed >= 1, 'processed count must be at least 1 (our test lead)');
+
+  // Verify the original pro is now marked missed
+  const historyRaw = await readMeta(lead_id, 'lead_routing_history');
+  const updatedHistory = JSON.parse(historyRaw);
+  const proEntry = updatedHistory.find(e => e.pro_id === pro_id);
+  assert.ok(proEntry, 'Original pro entry must still exist in history');
+  assert.equal(proEntry.status, 'missed', 'Original pro must be marked "missed"');
+  assert.ok(proEntry.responded_at !== null, 'responded_at must be set on missed entry');
+
+  // Assignee must be cleared (null/empty) or updated to next pro
+  const assigneeRaw = await readMeta(lead_id, 'lead_current_assignee');
+  const assignee = Number(assigneeRaw);
+  assert.ok(
+    !assigneeRaw || assigneeRaw === '' || assignee !== pro_id,
+    `Assignee must change from original pro (was ${pro_id}, now ${assigneeRaw})`
+  );
+
+  // Idempotency: triggering the cron again on an exhausted lead must not re-process it
+  if (!assigneeRaw || assigneeRaw === '') {
+    const { status: s2 } = await frpPost(
+      '/wp-json/frp/v1/admin/trigger-deadline-cron', {}, { auth: true }
+    );
+    assert.equal(s2, 200);
+    const histAfter = JSON.parse(await readMeta(lead_id, 'lead_routing_history'));
+    const ourEntries = histAfter.filter(e => e.pro_id === pro_id);
+    assert.equal(ourEntries.length, 1, 'Exhausted lead must not accumulate duplicate missed entries on re-trigger');
+  }
+});
+
 test('dispatch uses 1-hour deadline for emergency urgency', async () => {
   const uid = Date.now();
   const { status, body } = await frpPost('/wp-json/frp/v1/leads', {
