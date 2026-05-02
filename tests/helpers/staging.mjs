@@ -123,6 +123,9 @@ export async function deleteMeta(postId, key) {
 // Creates a test lead via the REST API. Tags it test_fixture=1 for cleanup.
 // opts.tokenExpired: true → backdates lead_update_token_expiry by 2 hours
 export async function createTestLead(opts = {}) {
+  // Reset rate limits before each lead creation so repeated test runs don't exhaust
+  // the per-IP bucket (3/15min hardcoded in frp-directory.php).
+  await frpPost('/wp-json/frp/v1/admin/reset-rate-limits', {}, { auth: true }).catch(() => {});
   const uid = Date.now();
   const { status, body } = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
