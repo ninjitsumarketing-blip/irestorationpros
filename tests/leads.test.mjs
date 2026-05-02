@@ -167,6 +167,38 @@ test('status endpoint — won clears current assignee', async () => {
   assert.ok(!assigneeRaw || assigneeRaw === '', 'lead_current_assignee must be empty after won');
 });
 
+test('status endpoint — lost closes lead (clears assignee)', async () => {
+  const { pro_id } = await loginAsPro('testpro1');
+  const uid = Date.now();
+  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+    phone: `555${uid.toString().slice(-7)}`,
+    service: 'water-damage', urgency: 'now',
+    property_type: 'residential', has_insurance: 'yes',
+    zip: '90210', source: 'guided_flow',
+  });
+  assert.equal(createRes.status, 200);
+  const lead_id = createRes.body.lead_id;
+  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
+    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
+
+  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
+  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
+  await setPostMeta(lead_id, 'lead_current_assignee', String(pro_id));
+  await setPostMeta(lead_id, 'lead_response_deadline', String(Math.floor(Date.now()/1000) + 3600));
+
+  const { status, body } = await frpPost(
+    `/wp-json/frp/v1/leads/${lead_id}/status`,
+    { status: 'lost' },
+    { auth: 'pro' }
+  );
+  assert.equal(status, 200, `lost status failed: ${JSON.stringify(body)}`);
+  assert.equal(body.status, 'lost');
+
+  // Assignee must be cleared (same as won — both are terminal)
+  const assigneeRaw = await readMeta(lead_id, 'lead_current_assignee');
+  assert.ok(!assigneeRaw || assigneeRaw === '', 'lead_current_assignee must be empty after lost');
+});
+
 test('status endpoint — invalid status returns 400', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   const uid = Date.now();

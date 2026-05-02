@@ -60,6 +60,8 @@ function frp_leads_permission_check() {
     if ( ! in_array( 'restoration_pro', (array) $user->roles, true ) ) {
         return new WP_Error( 'rest_forbidden', 'Contractor role required.', [ 'status' => 403 ] );
     }
+    // Note: we don't verify the pro post is still published here.
+    // The per-lead assignee check below provides the real access gate.
     $pro_id = frp_current_pro_id();
     if ( ! $pro_id ) return new WP_Error( 'rest_forbidden', 'No contractor profile found.', [ 'status' => 403 ] );
     return true;
@@ -111,7 +113,8 @@ function frp_leads_update_status( WP_REST_Request $req ) {
     update_post_meta( $lead_id, 'lead_routing_history',   wp_json_encode( $history ) );
     update_post_meta( $lead_id, 'lead_response_deadline', '' );  // clear deadline
 
-    if ( $new_status === 'won' ) {
+    // Both 'won' and 'lost' are terminal — clear assignee so the lead is not re-routable.
+    if ( in_array( $new_status, [ 'won', 'lost' ], true ) ) {
         update_post_meta( $lead_id, 'lead_current_assignee', '' );  // lead closed
     }
 
