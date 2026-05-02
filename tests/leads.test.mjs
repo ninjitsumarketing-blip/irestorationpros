@@ -1,7 +1,7 @@
 // tests/leads.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frpPost, frpPostLead } from './helpers/wp-client.mjs';
+import { frpGet, frpPost, frpPostLead } from './helpers/wp-client.mjs';
 import { resetTestLeads, readMeta, loginAsPro, setPostMeta } from './helpers/staging.mjs';
 
 test.before(async () => { await resetTestLeads(); });
@@ -319,6 +319,59 @@ assert.ok(
     const histAfter = JSON.parse(await readMeta(lead_id, 'lead_routing_history'));
     const ourEntries = histAfter.filter(e => e.pro_id === pro_id);
     assert.equal(ourEntries.length, 1, 'Exhausted lead must not accumulate duplicate missed entries on re-trigger');
+  }
+});
+
+// ── Stats endpoint tests ──────────────────────────────────────────────────
+
+test('stats endpoint — returns correct shape', async () => {
+  const { status, body } = await frpGet('/wp-json/frp/v1/me/stats', { auth: 'pro' });
+  assert.equal(status, 200, `stats endpoint failed: ${JSON.stringify(body)}`);
+
+  assert.ok('leads_received_total' in body, 'missing leads_received_total');
+  assert.ok('leads_by_week'        in body, 'missing leads_by_week');
+  assert.ok('response_rate'        in body, 'missing response_rate');
+  assert.ok('win_rate'             in body, 'missing win_rate');
+  assert.ok('recent_leads'         in body, 'missing recent_leads');
+
+  assert.ok(typeof body.leads_received_total === 'number', 'leads_received_total must be number');
+  assert.ok(Array.isArray(body.leads_by_week),             'leads_by_week must be array');
+  assert.ok(Array.isArray(body.recent_leads),              'recent_leads must be array');
+
+  if (body.leads_by_week.length > 0) {
+    const entry = body.leads_by_week[0];
+    assert.ok('week'  in entry, 'leads_by_week entry missing week');
+    assert.ok('count' in entry, 'leads_by_week entry missing count');
+  }
+
+  if (body.recent_leads.length > 0) {
+    const lead = body.recent_leads[0];
+    assert.ok('lead_id'     in lead, 'recent_leads entry missing lead_id');
+    assert.ok('service'     in lead, 'recent_leads entry missing service');
+    assert.ok('city'        in lead, 'recent_leads entry missing city');
+    assert.ok('urgency'     in lead, 'recent_leads entry missing urgency');
+    assert.ok('status'      in lead, 'recent_leads entry missing status');
+    assert.ok('assigned_at' in lead, 'recent_leads entry missing assigned_at');
+  }
+});
+
+test('stats endpoint — unauthenticated returns 401', async () => {
+  const { status } = await frpGet('/wp-json/frp/v1/me/stats');
+  assert.equal(status, 401);
+});
+
+test('stats endpoint — zero-lead pro returns empty-state shape', async () => {
+  const { status, body } = await frpGet('/wp-json/frp/v1/me/stats', { auth: 'pro' });
+  assert.equal(status, 200);
+  if (body.leads_received_total === 0) {
+    assert.equal(body.response_rate, null, 'response_rate must be null when no leads');
+    assert.equal(body.win_rate,      null, 'win_rate must be null when no leads');
+    assert.deepEqual(body.recent_leads, [], 'recent_leads must be empty array when no leads');
+  } else {
+    const rr = body.response_rate;
+    const wr = body.win_rate;
+    assert.ok(rr === null || (typeof rr === 'number' && !isNaN(rr)), 'response_rate must be null or a valid number');
+    assert.ok(wr === null || (typeof wr === 'number' && !isNaN(wr)), 'win_rate must be null or a valid number');
   }
 });
 

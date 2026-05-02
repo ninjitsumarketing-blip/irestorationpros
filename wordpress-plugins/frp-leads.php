@@ -52,6 +52,13 @@ function frp_leads_register_routes() {
         'callback'            => 'frp_leads_trigger_deadline_cron',
         'permission_callback' => fn() => current_user_can( 'manage_options' ),
     ] );
+
+    // GET /frp/v1/me/stats
+    register_rest_route( 'frp/v1', '/me/stats', [
+        'methods'             => 'GET',
+        'callback'            => 'frp_leads_get_stats',
+        'permission_callback' => 'frp_leads_permission_check',
+    ] );
 }
 
 function frp_leads_permission_check() {
@@ -253,4 +260,93 @@ function frp_process_lead_deadlines() {
     }
 
     return $count;
+}
+
+// ── Stats Endpoint ────────────────────────────────────────────────────────────
+
+function frp_leads_get_stats() {
+    $pro_id = frp_current_pro_id();
+
+    // Query all leads where this pro appears in routing history.
+    // LIKE on JSON blob is not perfectly precise but is sufficient for
+    // single-digit pro IDs that won't appear as substrings of other IDs.
+    $leads_query = new WP_Query( [
+        'post_type'              => 'frp_lead',
+        'post_status'            => 'publish',
+        'posts_per_page'         => -1,
+        'no_found_rows'          => true,
+        'update_post_meta_cache' => false,
+        'meta_query'             => [[
+            'key'     => 'lead_routing_history',
+            'value'   => '"pro_id":' . $pro_id,
+            'compare' => 'LIKE',
+        ]],
+        'orderby' => 'date',
+        'order'   => 'DESC',
+    ] );
+
+    $all_leads            = $leads_query->posts;
+    $leads_received_total = 0;
+    $responded            = 0;
+    $won                  = 0;
+    $recent_leads         = [];
+
+    // Build ISO week buckets for last 8 weeks (oldest first)
+    $week_map = [];
+    for ( $i = 7; $i >= 0; $i-- ) {
+        $ts   = strtotime( "-{$i} weeks" );
+        $wkey = gmdate( 'o-\WW', $ts );  // e.g. "2026-W17"
+        $week_map[ $wkey ] = 0;
+    }
+
+    foreach ( $all_leads as $lead ) {
+        $history_raw = get_post_meta( $lead->ID, 'lead_routing_history', true );
+        $history     = $history_raw ? json_decode( $history_raw, true ) : [];
+
+        foreach ( $history as $entry ) {
+            if ( (int) $entry['pro_id'] !== $pro_id ) continue;
+
+            $leads_received_total++;
+
+            $status = $entry['status'] ?? 'pending';
+            // "responded" means any terminal status that isn't a miss/no-response
+            if ( ! in_array( $status, [ 'pending', 'missed' ], true ) ) $responded++;
+            if ( $status === 'won' ) $won++;
+
+            // Count into the correct ISO week bucket
+            $assigned_ts = (int) ( $entry['assigned_at'] ?? 0 );
+            if ( $assigned_ts ) {
+                $wkey = gmdate( 'o-\WW', $assigned_ts );
+                if ( isset( $week_map[ $wkey ] ) ) $week_map[ $wkey ]++;
+            }
+
+            // Collect last 20 for the recent_leads table
+            if ( count( $recent_leads ) < 20 ) {
+                $recent_leads[] = [
+                    'lead_id'     => $lead->ID,
+                    'service'     => get_post_meta( $lead->ID, 'lead_service', true ),
+                    'city'        => get_post_meta( $lead->ID, 'lead_city',    true ),
+                    'urgency'     => get_post_meta( $lead->ID, 'lead_urgency', true ),
+                    'status'      => $status,
+                    'assigned_at' => $assigned_ts,
+                ];
+            }
+
+            break;  // Count this pro's entry once per lead
+        }
+    }
+
+    // Convert week_map to array of { week, count } objects
+    $leads_by_week = [];
+    foreach ( $week_map as $wkey => $cnt ) {
+        $leads_by_week[] = [ 'week' => $wkey, 'count' => $cnt ];
+    }
+
+    return rest_ensure_response( [
+        'leads_received_total' => $leads_received_total,
+        'leads_by_week'        => $leads_by_week,
+        'response_rate'        => $leads_received_total > 0 ? round( $responded / $leads_received_total, 4 ) : null,
+        'win_rate'             => $responded > 0 ? round( $won / $responded, 4 ) : null,
+        'recent_leads'         => $recent_leads,
+    ] );
 }
