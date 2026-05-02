@@ -164,6 +164,8 @@ function frp_process_lead_deadlines() {
         'post_type'      => 'frp_lead',
         'post_status'    => 'publish',
         'posts_per_page' => 100,
+        'no_found_rows'          => true,
+        'update_post_meta_cache' => false,
         'meta_query'     => [
             'relation' => 'AND',
             [

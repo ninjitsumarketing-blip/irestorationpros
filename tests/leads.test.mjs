@@ -300,6 +300,16 @@ assert.ok(
     `Assignee must change from original pro (was ${pro_id}, now ${assigneeRaw})`
   );
 
+  // If reassigned: verify the new history entry was written correctly
+  if (assigneeRaw && assigneeRaw !== '' && assignee !== pro_id) {
+    const histAfterAssign = JSON.parse(await readMeta(lead_id, 'lead_routing_history'));
+    const newEntry = histAfterAssign.find(e => e.pro_id === assignee);
+    assert.ok(newEntry, 'New pro entry must exist in routing history after reassignment');
+    assert.equal(newEntry.status, 'pending', 'New pro entry must have pending status');
+    assert.equal(newEntry.responded_at, null, 'New pro entry responded_at must be null');
+    assert.ok(typeof newEntry.assigned_at === 'number', 'New pro entry must have assigned_at timestamp');
+  }
+
   // Idempotency: triggering the cron again on an exhausted lead must not re-process it
   if (!assigneeRaw || assigneeRaw === '') {
     const { status: s2 } = await frpPost(
