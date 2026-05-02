@@ -43,7 +43,9 @@ test('unauthenticated request to leads-html returns 401', async () => {
 });
 
 test('authenticated pro dashboard has analytics tab', async () => {
-  const { STAGING_URL, STAGING_PRO_USERNAME, STAGING_PRO_APP_PASSWORD } = process.env;
+  const STAGING_URL           = process.env.FRP_STAGING_URL;
+  const STAGING_PRO_USERNAME  = process.env.FRP_STAGING_PRO_USERNAME;
+  const STAGING_PRO_APP_PASSWORD = process.env.FRP_STAGING_PRO_APP_PASSWORD;
   const url  = `${STAGING_URL}/contractor/dashboard/`;
   const cred = Buffer.from(`${STAGING_PRO_USERNAME}:${STAGING_PRO_APP_PASSWORD}`).toString('base64');
   const res  = await fetch(url, {

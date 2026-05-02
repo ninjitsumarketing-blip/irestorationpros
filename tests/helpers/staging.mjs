@@ -144,6 +144,13 @@ export async function createTestLead(opts = {}) {
   }
   if (opts.assignTo) {
     await setPostMeta(body.lead_id, 'lead_assigned_pros', JSON.stringify([opts.assignTo]));
+    await setPostMeta(body.lead_id, 'lead_routing_history', JSON.stringify([{
+      pro_id: Number(opts.assignTo),
+      assigned_at: Math.floor(Date.now() / 1000),
+      responded_at: null,
+      status: 'pending',
+    }]));
+    await setPostMeta(body.lead_id, 'lead_current_assignee', String(opts.assignTo));
   }
   return { lead_id: body.lead_id, token: body.lead_update_token };
 }

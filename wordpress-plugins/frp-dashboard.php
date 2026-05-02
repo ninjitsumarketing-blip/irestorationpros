@@ -36,6 +36,11 @@ function frp_dashboard_render() {
       <section id="frp-tab-profile"   class="frp-tab-pane"><?php echo frp_dashboard_profile_html( $pro_id ); ?></section>
       <section id="frp-tab-billing"   class="frp-tab-pane"><?php echo frp_dashboard_billing_html( $pro_id ); ?></section>
     </div>
+    <?php
+    // Inline the nonce directly — wp_localize_script requires an array and
+    // wp-api-request is not guaranteed to be enqueued on all themes.
+    echo '<script>var frpDashNonce = "' . esc_js( wp_create_nonce( 'wp_rest' ) ) . '";</script>';
+    ?>
     <script>
     (function () {
       // ── Tab switching ──────────────────────────────────────────────────
@@ -144,8 +149,11 @@ function frp_dashboard_render() {
         fetch('/wp-json/frp/v1/me/stats', {
           headers: { 'X-WP-Nonce': frpDashNonce }
         })
-        .then(function(r){ return r.json(); })
-        .then(function(data){ frpRenderAnalytics(container, data); })
+        .then(function(r){ return r.json().then(function(b){ return { ok: r.ok, body: b }; }); })
+        .then(function(res){
+          if (!res.ok) throw new Error((res.body && res.body.message) ? res.body.message : 'API error');
+          frpRenderAnalytics(container, res.body);
+        })
         .catch(function(){ container.innerHTML = '<p class="frp-error">Failed to load analytics.</p>'; });
       }
 
@@ -243,9 +251,6 @@ function frp_dashboard_render() {
     })();
     </script>
     <?php
-    // Inline the nonce directly — wp_localize_script requires an array and
-    // wp-api-request is not guaranteed to be enqueued on all themes.
-    echo '<script>var frpDashNonce = "' . esc_js( wp_create_nonce( 'wp_rest' ) ) . '";</script>';
     return ob_get_clean();
 }
 
@@ -256,6 +261,7 @@ function frp_dashboard_leads_html( $pro_id ) {
         'post_type'      => 'frp_lead',
         'posts_per_page' => 50,
         'post_status'    => 'publish',
+        'no_found_rows'  => true,
         'meta_query'     => [[
             'key'     => 'lead_routing_history',
             'value'   => '"pro_id":' . $pro_id,
@@ -286,7 +292,7 @@ function frp_dashboard_leads_html( $pro_id ) {
 
         $status    = $my_entry['status'] ?? 'pending';
         $city      = esc_html( get_post_meta( $id, 'lead_city',          true ) );
-        $svc       = esc_html( get_post_meta( $id, 'lead_service',       true ) );
+        $svc       = get_post_meta( $id, 'lead_service',       true );
         $urgency   = get_post_meta( $id, 'lead_urgency',     true );
         $score     = (int) get_post_meta( $id, 'lead_score',       true );
         $phone_raw = get_post_meta( $id, 'lead_phone',       true );
