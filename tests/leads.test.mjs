@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { frpGet, frpPost, frpPostLead } from './helpers/wp-client.mjs';
-import { resetTestLeads, readMeta, loginAsPro, setPostMeta } from './helpers/staging.mjs';
+import { resetTestLeads, readMeta, loginAsPro, setPostMeta, createTestLead } from './helpers/staging.mjs';
 
 test.before(async () => { await resetTestLeads(); });
 test.after(async ()  => { await resetTestLeads(); });
@@ -62,21 +62,7 @@ test('status endpoint — happy path: mark contacted', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
 
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  assert.equal(createRes.status, 200);
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
-
-  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
-  await setPostMeta(lead_id, 'lead_routing_history',   JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee',  String(pro_id));
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
   await setPostMeta(lead_id, 'lead_response_deadline', String(Math.floor(Date.now()/1000) + 3600));
 
   const { status, body } = await frpPost(
@@ -98,22 +84,8 @@ test('status endpoint — happy path: mark contacted', async () => {
 });
 
 test('status endpoint — wrong assignee returns 403', async () => {
-  const { pro_id } = await loginAsPro('testpro1');
-
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
-
-  const history = [{ pro_id: 9999999, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
-  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee', '9999999');
+  // Assign to a non-existent pro so testpro1 is not the current assignee
+  const { lead_id } = await createTestLead({ assignTo: 9999999 });
 
   const { status } = await frpPost(
     `/wp-json/frp/v1/leads/${lead_id}/status`,
@@ -139,20 +111,7 @@ test('status endpoint — non-existent lead returns 404', async () => {
 
 test('status endpoint — won clears current assignee', async () => {
   const { pro_id } = await loginAsPro('testpro1');
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
-
-  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
-  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee', String(pro_id));
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
   await setPostMeta(lead_id, 'lead_response_deadline', String(Math.floor(Date.now()/1000) + 3600));
 
   const { status, body } = await frpPost(
@@ -169,21 +128,7 @@ test('status endpoint — won clears current assignee', async () => {
 
 test('status endpoint — lost closes lead (clears assignee)', async () => {
   const { pro_id } = await loginAsPro('testpro1');
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  assert.equal(createRes.status, 200);
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
-
-  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
-  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee', String(pro_id));
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
   await setPostMeta(lead_id, 'lead_response_deadline', String(Math.floor(Date.now()/1000) + 3600));
 
   const { status, body } = await frpPost(
@@ -201,20 +146,7 @@ test('status endpoint — lost closes lead (clears assignee)', async () => {
 
 test('status endpoint — invalid status returns 400', async () => {
   const { pro_id } = await loginAsPro('testpro1');
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
-
-  const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }];
-  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee', String(pro_id));
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
 
   const { status } = await frpPost(
     `/wp-json/frp/v1/leads/${lead_id}/status`,
@@ -226,20 +158,11 @@ test('status endpoint — invalid status returns 400', async () => {
 
 test('status endpoint — already responded returns 409', async () => {
   const { pro_id } = await loginAsPro('testpro1');
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
 
+  // Override routing history to already-responded state
   const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000) - 60, responded_at: Math.floor(Date.now()/1000), status: 'contacted' }];
-  await setPostMeta(lead_id, 'lead_routing_history',  JSON.stringify(history));
-  await setPostMeta(lead_id, 'lead_current_assignee', String(pro_id));
+  await setPostMeta(lead_id, 'lead_routing_history', JSON.stringify(history));
 
   const { status } = await frpPost(
     `/wp-json/frp/v1/leads/${lead_id}/status`,
@@ -253,19 +176,10 @@ test('deadline fallback: overdue lead marks missed and reassigns or exhausts', a
   const { pro_id } = await loginAsPro('testpro1');
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
 
-  const uid = Date.now();
-  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  assert.equal(createRes.status, 200);
-  const lead_id = createRes.body.lead_id;
-  await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-    { post_id: lead_id, meta: { test_fixture: '1' } }, { auth: true });
+  const { lead_id } = await createTestLead({ assignTo: pro_id });
 
-  const pastDeadline = String(Math.floor(Date.now() / 1000) - 7200); // 2 hours ago
+  // Override to an overdue state (2 hours in the past)
+  const pastDeadline = String(Math.floor(Date.now() / 1000) - 7200);
   const history = [{ pro_id, assigned_at: Math.floor(Date.now()/1000) - 7200, responded_at: null, status: 'pending' }];
   await setPostMeta(lead_id, 'lead_routing_history',   JSON.stringify(history));
   await setPostMeta(lead_id, 'lead_current_assignee',  String(pro_id));
@@ -328,22 +242,7 @@ test('stats endpoint — returns correct shape', async () => {
   // Seed one lead assigned to the staging pro so shape assertions always execute
   const { pro_id } = await loginAsPro('testpro1');
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
-  const uid = Date.now();
-  const seedRes = await frpPostLead('/wp-json/frp/v1/leads', {
-    phone: `555${uid.toString().slice(-7)}`,
-    service: 'water-damage', urgency: 'now',
-    property_type: 'residential', has_insurance: 'yes',
-    zip: '90210', source: 'guided_flow',
-  });
-  if (seedRes.status === 200) {
-    const seedId = seedRes.body.lead_id;
-    await frpPost('/wp-json/frp/v1/admin/set-post-meta',
-      { post_id: seedId, meta: { test_fixture: '1' } }, { auth: true });
-    // Wire the staging pro as assignee so stats endpoint finds it
-    await setPostMeta(seedId, 'lead_routing_history',
-      JSON.stringify([{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }]));
-    await setPostMeta(seedId, 'lead_current_assignee', String(pro_id));
-  }
+  await createTestLead({ assignTo: pro_id });
 
   const { status, body } = await frpGet('/wp-json/frp/v1/me/stats', { auth: 'pro' });
   assert.equal(status, 200, `stats endpoint failed: ${JSON.stringify(body)}`);

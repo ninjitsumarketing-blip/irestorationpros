@@ -43,17 +43,11 @@ test('unauthenticated request to leads-html returns 401', async () => {
 });
 
 test('authenticated pro dashboard has analytics tab', async () => {
-  const STAGING_URL           = process.env.FRP_STAGING_URL;
-  const STAGING_PRO_USERNAME  = process.env.FRP_STAGING_PRO_USERNAME;
-  const STAGING_PRO_APP_PASSWORD = process.env.FRP_STAGING_PRO_APP_PASSWORD;
-  const url  = `${STAGING_URL}/contractor/dashboard/`;
-  const cred = Buffer.from(`${STAGING_PRO_USERNAME}:${STAGING_PRO_APP_PASSWORD}`).toString('base64');
-  const res  = await fetch(url, {
-    headers: { 'Authorization': `Basic ${cred}`, 'Accept': 'text/html' },
-    redirect: 'follow',
-  });
-  const html = await res.text();
-  assert.equal(res.status, 200, `Dashboard page failed: ${res.status}`);
-  assert.ok(html.includes('frp-dashboard'),     'Page must include frp-dashboard class');
-  assert.ok(html.includes('frp-analytics-tab'), 'Page must include frp-analytics-tab element');
+  // Fetch dashboard HTML via the REST endpoint — WP front-end pages ignore
+  // Authorization headers; only REST API routes accept Application Passwords.
+  const { status, body } = await frpGet('/wp-json/frp/v1/me/dashboard-html', { auth: 'pro' });
+  assert.equal(status, 200, `dashboard-html endpoint failed: ${JSON.stringify(body)}`);
+  const html = body.html ?? '';
+  assert.ok(html.includes('frp-dashboard'),     'HTML must include frp-dashboard class');
+  assert.ok(html.includes('frp-analytics-tab'), 'HTML must include frp-analytics-tab element');
 });

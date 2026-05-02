@@ -414,6 +414,18 @@ add_action( 'rest_api_init', function () {
             return is_user_logged_in() && frp_current_pro_id();
         },
     ] );
+
+    // Returns the full dashboard shortcode HTML — used by integration tests
+    // to verify dashboard structure without requiring cookie-based auth.
+    register_rest_route( 'frp/v1', '/me/dashboard-html', [
+        'methods'             => 'GET',
+        'callback'            => function () {
+            return rest_ensure_response( [ 'html' => frp_dashboard_render() ] );
+        },
+        'permission_callback' => function () {
+            return is_user_logged_in() && frp_current_pro_id();
+        },
+    ] );
 } );
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
