@@ -63,7 +63,7 @@ test('status endpoint — happy path: mark contacted', async () => {
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
 
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -101,7 +101,7 @@ test('status endpoint — wrong assignee returns 403', async () => {
   const { pro_id } = await loginAsPro('testpro1');
 
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -140,7 +140,7 @@ test('status endpoint — non-existent lead returns 404', async () => {
 test('status endpoint — won clears current assignee', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -170,7 +170,7 @@ test('status endpoint — won clears current assignee', async () => {
 test('status endpoint — lost closes lead (clears assignee)', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -202,7 +202,7 @@ test('status endpoint — lost closes lead (clears assignee)', async () => {
 test('status endpoint — invalid status returns 400', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -227,7 +227,7 @@ test('status endpoint — invalid status returns 400', async () => {
 test('status endpoint — already responded returns 409', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -254,7 +254,7 @@ test('deadline fallback: overdue lead marks missed and reassigns or exhausts', a
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
 
   const uid = Date.now();
-  const createRes = await frpPost('/wp-json/frp/v1/leads', {
+  const createRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -329,7 +329,7 @@ test('stats endpoint — returns correct shape', async () => {
   const { pro_id } = await loginAsPro('testpro1');
   assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
   const uid = Date.now();
-  const seedRes = await frpPost('/wp-json/frp/v1/leads', {
+  const seedRes = await frpPostLead('/wp-json/frp/v1/leads', {
     phone: `555${uid.toString().slice(-7)}`,
     service: 'water-damage', urgency: 'now',
     property_type: 'residential', has_insurance: 'yes',
@@ -397,7 +397,7 @@ test('stats endpoint — zero-lead pro returns empty-state shape', async () => {
 
 test('dispatch uses 1-hour deadline for emergency urgency', async () => {
   const uid = Date.now();
-  const { status, body } = await frpPost('/wp-json/frp/v1/leads', {
+  const { status, body } = await frpPostLead('/wp-json/frp/v1/leads', {
     phone:         `555${uid.toString().slice(-7)}`,
     service:       'water-damage',
     urgency:       'emergency',
