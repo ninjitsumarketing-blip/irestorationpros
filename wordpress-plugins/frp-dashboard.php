@@ -129,8 +129,7 @@ function frp_dashboard_render() {
           } else {
             var h = Math.floor(diff / 3600);
             var m = Math.floor((diff % 3600) / 60);
-            var s = diff % 60;
-            el.textContent = (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
+            el.textContent = 'Respond within ' + (h > 0 ? h + 'h ' : '') + m + 'm';
           }
         });
       }
@@ -167,7 +166,7 @@ function frp_dashboard_render() {
               '<div class="frp-sparkline">' + sparkBars + '</div>' +
             '</div>' +
             '<div class="frp-stat-card">' +
-              '<div class="frp-stat-value ' + rateColor + '">' + (d.response_rate !== null ? Math.round(d.response_rate * 100) + '%' : '—') + '</div>' +
+              '<div class="frp-stat-value">' + (d.response_rate !== null && rateColor ? '<span class="frp-stat-dot ' + rateColor + '"></span>' : '') + (d.response_rate !== null ? Math.round(d.response_rate * 100) + '%' : '—') + '</div>' +
               '<div class="frp-stat-label">Response Rate</div>' +
             '</div>' +
             '<div class="frp-stat-card">' +
@@ -335,6 +334,7 @@ function frp_dashboard_leads_html( $pro_id ) {
               '</div>' .
               '<div class="frp-lead-details">' .
                 '<dl class="frp-lead-meta">' .
+                  ( $score     ? '<dt>Lead Score</dt><dd>' . $score . '</dd>'   : '' ) .
                   ( $prop_type ? '<dt>Property</dt><dd>' . $prop_type . '</dd>' : '' ) .
                   ( $insurance ? '<dt>Insurance</dt><dd>' . $insurance . '</dd>' : '' ) .
                   ( $scope     ? '<dt>Scope</dt><dd>' . $scope . '</dd>'         : '' ) .
@@ -431,8 +431,8 @@ function frp_dashboard_styles() {
     .frp-lead-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; flex-wrap: wrap; }
     .frp-expand-icon { margin-left: auto; color: #737780; font-size: 18px; transition: transform 0.2s; line-height: 1; }
     .frp-lead-card.frp-expanded .frp-expand-icon { transform: rotate(90deg); }
-    .frp-lead-details { display: none; padding: 0 16px 16px; border-top: 1px solid #f3f4f5; }
-    .frp-lead-card.frp-expanded .frp-lead-details { display: block; }
+    .frp-lead-details { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; padding: 0 16px; border-top: 1px solid #f3f4f5; }
+    .frp-lead-card.frp-expanded .frp-lead-details { max-height: 600px; padding-bottom: 16px; }
     .frp-lead-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 14px 0; font-size: 13px; }
     .frp-lead-meta dt { color: #737780; font-weight: 600; }
     .frp-lead-meta dd { margin: 0; }
@@ -484,6 +484,10 @@ function frp_dashboard_styles() {
     .frp-stat-card { background: #fff; border: 1px solid #e1e3e4; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
     .frp-stat-value { font-size: 36px; font-weight: 800; color: #001e40; line-height: 1.1; }
     .frp-stat-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #737780; margin-top: 4px; }
+    .frp-stat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .frp-stat-dot.frp-indicator-green { background: #1a5c1a; }
+    .frp-stat-dot.frp-indicator-amber { background: #7a3500; }
+    .frp-stat-dot.frp-indicator-red   { background: #ba1a1a; }
     .frp-indicator-green { color: #1a5c1a; }
     .frp-indicator-amber { color: #7a3500; }
     .frp-indicator-red   { color: #ba1a1a; }
