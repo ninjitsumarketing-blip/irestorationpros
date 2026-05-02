@@ -325,6 +325,26 @@ assert.ok(
 // ── Stats endpoint tests ──────────────────────────────────────────────────
 
 test('stats endpoint — returns correct shape', async () => {
+  // Seed one lead assigned to the staging pro so shape assertions always execute
+  const { pro_id } = await loginAsPro('testpro1');
+  assert.ok(pro_id, 'testpro1 must have frp_pro_id configured');
+  const uid = Date.now();
+  const seedRes = await frpPost('/wp-json/frp/v1/leads', {
+    phone: `555${uid.toString().slice(-7)}`,
+    service: 'water-damage', urgency: 'now',
+    property_type: 'residential', has_insurance: 'yes',
+    zip: '90210', source: 'guided_flow',
+  });
+  if (seedRes.status === 200) {
+    const seedId = seedRes.body.lead_id;
+    await frpPost('/wp-json/frp/v1/admin/set-post-meta',
+      { post_id: seedId, meta: { test_fixture: '1' } }, { auth: true });
+    // Wire the staging pro as assignee so stats endpoint finds it
+    await setPostMeta(seedId, 'lead_routing_history',
+      JSON.stringify([{ pro_id, assigned_at: Math.floor(Date.now()/1000), responded_at: null, status: 'pending' }]));
+    await setPostMeta(seedId, 'lead_current_assignee', String(pro_id));
+  }
+
   const { status, body } = await frpGet('/wp-json/frp/v1/me/stats', { auth: 'pro' });
   assert.equal(status, 200, `stats endpoint failed: ${JSON.stringify(body)}`);
 

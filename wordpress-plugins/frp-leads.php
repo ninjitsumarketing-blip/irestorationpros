@@ -274,11 +274,12 @@ function frp_leads_get_stats() {
         'post_type'              => 'frp_lead',
         'post_status'            => 'publish',
         'posts_per_page'         => -1,
-        'no_found_rows'          => true,
-        'update_post_meta_cache' => false,
+        'no_found_rows' => true,
+        // update_post_meta_cache intentionally left at default (true):
+        // we call get_post_meta for every result, so pre-loading is more efficient.
         'meta_query'             => [[
             'key'     => 'lead_routing_history',
-            'value'   => '"pro_id":' . $pro_id,
+            'value'   => '"pro_id":' . $pro_id . ',',
             'compare' => 'LIKE',
         ]],
         'orderby' => 'date',
@@ -303,36 +304,39 @@ function frp_leads_get_stats() {
         $history_raw = get_post_meta( $lead->ID, 'lead_routing_history', true );
         $history     = $history_raw ? json_decode( $history_raw, true ) : [];
 
-        foreach ( $history as $entry ) {
-            if ( (int) $entry['pro_id'] !== $pro_id ) continue;
+        // Find ALL entries for this pro (handles re-assignment edge case).
+        // Count the lead once and use the most recent entry for display.
+        $pro_entries = array_filter( $history, fn($e) => (int) $e['pro_id'] === $pro_id );
+        if ( empty( $pro_entries ) ) continue;
 
-            $leads_received_total++;
+        $leads_received_total++;
 
-            $status = $entry['status'] ?? 'pending';
-            // "responded" means any terminal status that isn't a miss/no-response
-            if ( ! in_array( $status, [ 'pending', 'missed' ], true ) ) $responded++;
-            if ( $status === 'won' ) $won++;
+        // Use the last entry (most recent assignment) for status/assigned_at
+        $latest_entry = end( $pro_entries );
+        $status       = $latest_entry['status'] ?? 'pending';
+        $assigned_ts  = (int) ( $latest_entry['assigned_at'] ?? 0 );
 
-            // Count into the correct ISO week bucket
-            $assigned_ts = (int) ( $entry['assigned_at'] ?? 0 );
-            if ( $assigned_ts ) {
-                $wkey = gmdate( 'o-\WW', $assigned_ts );
-                if ( isset( $week_map[ $wkey ] ) ) $week_map[ $wkey ]++;
-            }
+        if ( ! in_array( $status, [ 'pending', 'missed' ], true ) ) $responded++;
+        if ( $status === 'won' ) $won++;
 
-            // Collect last 20 for the recent_leads table
-            if ( count( $recent_leads ) < 20 ) {
-                $recent_leads[] = [
-                    'lead_id'     => $lead->ID,
-                    'service'     => get_post_meta( $lead->ID, 'lead_service', true ),
-                    'city'        => get_post_meta( $lead->ID, 'lead_city',    true ),
-                    'urgency'     => get_post_meta( $lead->ID, 'lead_urgency', true ),
-                    'status'      => $status,
-                    'assigned_at' => $assigned_ts,
-                ];
-            }
+        // Count into the correct ISO week bucket using first assignment time
+        $first_entry = reset( $pro_entries );
+        $first_ts    = (int) ( $first_entry['assigned_at'] ?? 0 );
+        if ( $first_ts ) {
+            $wkey = gmdate( 'o-\WW', $first_ts );
+            if ( isset( $week_map[ $wkey ] ) ) $week_map[ $wkey ]++;
+        }
 
-            break;  // Count this pro's entry once per lead
+        // Collect last 20 for the recent_leads table
+        if ( count( $recent_leads ) < 20 ) {
+            $recent_leads[] = [
+                'lead_id'     => $lead->ID,
+                'service'     => get_post_meta( $lead->ID, 'lead_service', true ),
+                'city'        => get_post_meta( $lead->ID, 'lead_city',    true ),
+                'urgency'     => get_post_meta( $lead->ID, 'lead_urgency', true ),
+                'status'      => $status,
+                'assigned_at' => $assigned_ts,
+            ];
         }
     }
 
