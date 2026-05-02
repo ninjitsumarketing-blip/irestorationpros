@@ -46,6 +46,25 @@ function frp_leads_register_routes() {
         ],
     ] );
 
+    // GET /frp/v1/admin/get-user-meta  (test/ops helper — reads arbitrary user meta as admin)
+    register_rest_route( 'frp/v1', '/admin/get-user-meta', [
+        'methods'             => 'GET',
+        'callback'            => function( WP_REST_Request $req ) {
+            $user_id = (int) $req->get_param( 'user_id' );
+            $key     = sanitize_key( $req->get_param( 'key' ) );
+            if ( ! $user_id || ! $key ) {
+                return new WP_Error( 'bad_request', 'user_id and key required', [ 'status' => 400 ] );
+            }
+            $value = get_user_meta( $user_id, $key, true );
+            return rest_ensure_response( [ 'value' => $value === '' ? null : $value ] );
+        },
+        'permission_callback' => fn() => current_user_can( 'manage_options' ),
+        'args'                => [
+            'user_id' => [ 'required' => true, 'validate_callback' => fn($v) => is_numeric($v) && $v > 0 ],
+            'key'     => [ 'required' => true ],
+        ],
+    ] );
+
     // POST /frp/v1/admin/trigger-deadline-cron  (test/ops helper — will be fleshed out in Task 3)
     register_rest_route( 'frp/v1', '/admin/trigger-deadline-cron', [
         'methods'             => 'POST',
