@@ -41,3 +41,17 @@ test('unauthenticated request to leads-html returns 401', async () => {
   const { status } = await frpGet('/wp-json/frp/v1/me/leads-html');
   assert.equal(status, 401);
 });
+
+test('authenticated pro dashboard has analytics tab', async () => {
+  const { STAGING_URL, STAGING_PRO_USERNAME, STAGING_PRO_APP_PASSWORD } = process.env;
+  const url  = `${STAGING_URL}/contractor/dashboard/`;
+  const cred = Buffer.from(`${STAGING_PRO_USERNAME}:${STAGING_PRO_APP_PASSWORD}`).toString('base64');
+  const res  = await fetch(url, {
+    headers: { 'Authorization': `Basic ${cred}`, 'Accept': 'text/html' },
+    redirect: 'follow',
+  });
+  const html = await res.text();
+  assert.equal(res.status, 200, `Dashboard page failed: ${res.status}`);
+  assert.ok(html.includes('frp-dashboard'),     'Page must include frp-dashboard class');
+  assert.ok(html.includes('frp-analytics-tab'), 'Page must include frp-analytics-tab element');
+});
