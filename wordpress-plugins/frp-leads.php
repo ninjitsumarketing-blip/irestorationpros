@@ -236,6 +236,9 @@ function frp_process_lead_deadlines() {
             } else {
                 // No more pros — lead exhausted
                 update_post_meta( $lead_id, 'lead_routing_history',   wp_json_encode( $history ) );
+                // Empty string is the canonical null-sentinel for lead_current_assignee.
+                // WordPress meta storage is string-native; '' is used consistently throughout
+                // this file and in the WP_Query filter (compare != '') to mean "no assignee".
                 update_post_meta( $lead_id, 'lead_current_assignee',  '' );
                 update_post_meta( $lead_id, 'lead_response_deadline', '' );
             }

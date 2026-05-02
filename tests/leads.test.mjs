@@ -286,6 +286,11 @@ test('deadline fallback: overdue lead marks missed and reassigns or exhausts', a
   assert.ok(proEntry, 'Original pro entry must still exist in history');
   assert.equal(proEntry.status, 'missed', 'Original pro must be marked "missed"');
   assert.ok(proEntry.responded_at !== null, 'responded_at must be set on missed entry');
+const nowTs = Math.floor(Date.now() / 1000);
+assert.ok(
+  proEntry.responded_at >= nowTs - 30 && proEntry.responded_at <= nowTs + 5,
+  `responded_at must be a recent timestamp, got ${proEntry.responded_at}`
+);
 
   // Assignee must be cleared (null/empty) or updated to next pro
   const assigneeRaw = await readMeta(lead_id, 'lead_current_assignee');
